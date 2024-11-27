@@ -1,0 +1,8 @@
+# Upstream changes from _extends are only recognized when modifications are made to this file in the default branch.
+_extends: .github
+repository:
+  name: aws-tfstate-backend
+  description: This component is responsible for provisioning an S3 Bucket and DynamoDB table that follow security best practices for usage as a Terraform backend
+  homepage: https://cloudposse.com/accelerate
+  topics: terraform, terraform-component
+
