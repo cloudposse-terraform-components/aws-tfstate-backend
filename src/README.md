@@ -6,7 +6,7 @@ tags:
   - privileged
 ---
 
-# Component: `tfstate`
+# Component: `tfstate-backend`
 
 This component is responsible for provisioning an S3 Bucket and DynamoDB table that follow security best practices for
 usage as a Terraform backend. It also creates IAM roles for access to the Terraform backend.
