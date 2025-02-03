@@ -83,6 +83,11 @@ func TestComponent(t *testing.T) {
 			accessRoleARNs := atm.OutputMapOfObjects(component, "tfstate_backend_access_role_arns")
 			assert.NotEmpty(t, accessRoleARNs)
 
+			// Verify that our Bucket has versioning enabled
+			actualStatus := aws.GetS3BucketVersioning(t, awsRegion, bucketID)
+			expectedStatus := "Enabled"
+			assert.Equal(t, expectedStatus, actualStatus)
+
 			policyString := aws.GetS3BucketPolicy(t, awsRegion, bucketID)
 
 			var policy BucketPolicy
