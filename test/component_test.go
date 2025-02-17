@@ -9,152 +9,158 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/cloudposse/test-helpers/pkg/atmos"
-	helper "github.com/cloudposse/test-helpers/pkg/atmos/aws-component-helper"
+	helper "github.com/cloudposse/test-helpers/pkg/atmos/component-helper"
 	"github.com/gruntwork-io/terratest/modules/aws"
 	"github.com/stretchr/testify/assert"
 )
 
 type LifecyclePolicyRuleSelection struct {
-	TagStatus     string   `json:"tagStatus"`
-	TagPrefixList []string `json:"tagPrefixList"`
-	CountType     string   `json:"countType"`
-	CountNumber   int      `json:"countNumber"`
+    TagStatus     string   `json:"tagStatus"`
+    TagPrefixList []string `json:"tagPrefixList"`
+    CountType     string   `json:"countType"`
+    CountNumber   int      `json:"countNumber"`
 }
 type LifecyclePolicyRule struct {
-	RulePriority int                          `json:"rulePriority"`
-	Description  string                       `json:"description"`
-	Selection    LifecyclePolicyRuleSelection `json:"selection"`
-	Action       map[string]string            `json:"action"`
+    RulePriority int                          `json:"rulePriority"`
+    Description  string                       `json:"description"`
+    Selection    LifecyclePolicyRuleSelection `json:"selection"`
+    Action       map[string]string            `json:"action"`
 }
 type LifecyclePolicy struct {
-	Rules []LifecyclePolicyRule `json:"rules"`
+    Rules []LifecyclePolicyRule `json:"rules"`
 }
 
 type BucketPolicy struct {
-	Version   string `json:"Version"`
-	Statement []struct {
-		Sid       string      `json:"Sid,omitempty"`
-		Principal string      `json:"Principal"`
-		Effect    string      `json:"Effect"`
-		Action    string      `json:"Action"`
-		Resource  interface{} `json:"Resource"` // Changed to interface{} to accommodate array
-		Condition struct {
-			StringEquals    map[string]string   `json:"StringEquals,omitempty"`
-			StringNotEquals map[string][]string `json:"StringNotEquals,omitempty"`
-			Null            map[string]string   `json:"Null,omitempty"`
-			Bool            map[string]bool     `json:"Bool,omitempty"` // Added Bool for new condition
-			ArnLike         map[string][]string `json:"ArnLike,omitempty"`
-		} `json:"Condition"`
-	} `json:"Statement"`
+    Version   string `json:"Version"`
+    Statement []struct {
+        Sid       string      `json:"Sid,omitempty"`
+        Principal string      `json:"Principal"`
+        Effect    string      `json:"Effect"`
+        Action    string      `json:"Action"`
+        Resource  interface{} `json:"Resource"` // Changed to interface{} to accommodate array
+        Condition struct {
+            StringEquals    map[string]string   `json:"StringEquals,omitempty"`
+            StringNotEquals map[string][]string `json:"StringNotEquals,omitempty"`
+            Null            map[string]string   `json:"Null,omitempty"`
+            Bool            map[string]bool     `json:"Bool,omitempty"` // Added Bool for new condition
+            ArnLike         map[string][]string `json:"ArnLike,omitempty"`
+        } `json:"Condition"`
+    } `json:"Statement"`
 }
 
-func TestComponent(t *testing.T) {
-	awsRegion := "us-east-2"
+type ComponentSuite struct {
+	helper.TestSuite
+}
 
-	fixture := helper.NewFixture(t, "../", awsRegion, "test/fixtures")
+func (s *ComponentSuite) TestBasic() {
+	const component = "tfstate-bucket/basic"
+	const stack = "default-test"
+	const awsRegion = "us-east-2"
 
-	defer fixture.TearDown()
-	fixture.SetUp(&atmos.Options{})
+	defer s.DestroyAtmosComponent(s.T(), component, stack, nil)
+	options, _ := s.DeployAtmosComponent(s.T(), component, stack, nil)
+	assert.NotNil(s.T(), options)
 
-	fixture.Suite("default", func(t *testing.T, suite *helper.Suite) {
-		suite.Test(t, "basic", func(t *testing.T, atm *helper.Atmos) {
-			defer atm.GetAndDestroy("tfstate-bucket/basic", "default-test", map[string]interface{}{})
-			component := atm.GetAndDeploy("tfstate-bucket/basic", "default-test", map[string]interface{}{})
-			assert.NotNil(t, component)
+	bucketID := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_id")
+	assert.NotEmpty(s.T(), bucketID)
 
-			bucketID := atm.Output(component, "tfstate_backend_s3_bucket_id")
-			assert.NotEmpty(t, bucketID)
+	bucketDomainName := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_domain_name")
+	assert.Equal(s.T(), fmt.Sprintf("%s.s3.amazonaws.com", bucketID), bucketDomainName)
 
-			bucketDomainName := atm.Output(component, "tfstate_backend_s3_bucket_domain_name")
-			assert.Equal(t, fmt.Sprintf("%s.s3.amazonaws.com", bucketID), bucketDomainName)
+	bucketARN := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_arn")
+	assert.Equal(s.T(), fmt.Sprintf("arn:aws:s3:::%s", bucketID), bucketARN)
 
-			bucketARN := atm.Output(component, "tfstate_backend_s3_bucket_arn")
-			assert.Equal(t, fmt.Sprintf("arn:aws:s3:::%s", bucketID), bucketARN)
+	dynamodbTableName := atmos.Output(s.T(), options, "tfstate_backend_dynamodb_table_name")
+	assert.Equal(s.T(), fmt.Sprintf("%s-lock", bucketID), dynamodbTableName)
 
-			dynamodbTableName := atm.Output(component, "tfstate_backend_dynamodb_table_name")
-			assert.Equal(t, fmt.Sprintf("%s-lock", bucketID), dynamodbTableName)
+	dynamodbTableID := atmos.Output(s.T(), options, "tfstate_backend_dynamodb_table_id")
+	assert.Equal(s.T(), fmt.Sprintf("%s-lock", bucketID), dynamodbTableID)
 
-			dynamodbTableID := atm.Output(component, "tfstate_backend_dynamodb_table_id")
-			assert.Equal(t, fmt.Sprintf("%s-lock", bucketID), dynamodbTableID)
+	dynamodbTableARN := atmos.Output(s.T(), options, "tfstate_backend_dynamodb_table_arn")
+	assert.True(s.T(), strings.HasSuffix(dynamodbTableARN, dynamodbTableID))
 
-			dynamodbTableARN := atm.Output(component, "tfstate_backend_dynamodb_table_arn")
-			assert.True(t, strings.HasSuffix(dynamodbTableARN, dynamodbTableID))
+	accessRoleARNs := atmos.OutputMapOfObjects(s.T(), options, "tfstate_backend_access_role_arns")
+	assert.NotEmpty(s.T(), accessRoleARNs)
 
-			accessRoleARNs := atm.OutputMapOfObjects(component, "tfstate_backend_access_role_arns")
-			assert.NotEmpty(t, accessRoleARNs)
+	// Verify that our Bucket has versioning enabled
+	actualStatus := aws.GetS3BucketVersioning(s.T(), awsRegion, bucketID)
+	expectedStatus := "Enabled"
+	assert.Equal(s.T(), expectedStatus, actualStatus)
 
-			// Verify that our Bucket has versioning enabled
-			actualStatus := aws.GetS3BucketVersioning(t, awsRegion, bucketID)
-			expectedStatus := "Enabled"
-			assert.Equal(t, expectedStatus, actualStatus)
+	policyString := aws.GetS3BucketPolicy(s.T(), awsRegion, bucketID)
 
-			policyString := aws.GetS3BucketPolicy(t, awsRegion, bucketID)
+	var policy BucketPolicy
+	json.Unmarshal([]byte(policyString), &policy)
 
-			var policy BucketPolicy
-			json.Unmarshal([]byte(policyString), &policy)
-
-			statement := policy.Statement[0]
-
-			assert.Equal(t, "DenyIncorrectEncryptionHeader", statement.Sid)
-			assert.Equal(t, "s3:PutObject", statement.Action)
-			assert.Equal(t, "Deny", statement.Effect)
-			assert.Equal(t, fmt.Sprintf("arn:aws:s3:::%s/*", bucketID), statement.Resource)
-			assert.Equal(t, "AES256", statement.Condition.StringNotEquals["s3:x-amz-server-side-encryption"][0])
-
-			statement = policy.Statement[1]
-
-			assert.Equal(t, "DenyUnEncryptedObjectUploads", statement.Sid)
-			assert.Equal(t, "s3:PutObject", statement.Action)
-			assert.Equal(t, "Deny", statement.Effect)
-			assert.Equal(t, fmt.Sprintf("arn:aws:s3:::%s/*", bucketID), statement.Resource)
-			assert.Equal(t, "true", statement.Condition.Null["s3:x-amz-server-side-encryption"])
-
-			statement = policy.Statement[2] // Access the new statement
-
-			assert.Equal(t, "EnforceTlsRequestsOnly", statement.Sid)
-			assert.Equal(t, "s3:*", statement.Action)
-			assert.Equal(t, "Deny", statement.Effect)
-			assert.ElementsMatch(t, []string{
+	for _, statement := range policy.Statement {
+		switch statement.Sid {
+		case "DenyIncorrectEncryptionHeader":
+			assert.Equal(s.T(), "s3:PutObject", statement.Action)
+			assert.Equal(s.T(), "Deny", statement.Effect)
+			assert.Equal(s.T(), fmt.Sprintf("arn:aws:s3:::%s/*", bucketID), statement.Resource)
+			assert.Equal(s.T(), "AES256", statement.Condition.StringNotEquals["s3:x-amz-server-side-encryption"][0])
+		case "DenyUnEncryptedObjectUploads":
+			assert.Equal(s.T(), "s3:PutObject", statement.Action)
+			assert.Equal(s.T(), "Deny", statement.Effect)
+			assert.Equal(s.T(), fmt.Sprintf("arn:aws:s3:::%s/*", bucketID), statement.Resource)
+			assert.Equal(s.T(), "true", statement.Condition.Null["s3:x-amz-server-side-encryption"])
+		case "EnforceTlsRequestsOnly":
+			assert.Equal(s.T(), "s3:*", statement.Action)
+			assert.Equal(s.T(), "Deny", statement.Effect)
+			assert.ElementsMatch(s.T(), []string{
 				fmt.Sprintf("arn:aws:s3:::%s/*", bucketID),
 				fmt.Sprintf("arn:aws:s3:::%s", bucketID),
 			}, statement.Resource) // Check for multiple resources
-			assert.Equal(t, false, statement.Condition.Bool["aws:SecureTransport"]) // Check the Bool condition
+			assert.Equal(s.T(), false, statement.Condition.Bool["aws:SecureTransport"]) // Check the Bool condition
+		}
+	}
 
-			// Look up the DynamoDB table by name
-			table := aws.GetDynamoDBTable(t, awsRegion, dynamodbTableID)
+	// Look up the DynamoDB table by name
+	table := aws.GetDynamoDBTable(s.T(), awsRegion, dynamodbTableID)
 
-			assert.Equal(t, "ACTIVE", string(table.TableStatus))
-			assert.Equal(t, "LockID", *table.KeySchema[0].AttributeName)
-			assert.EqualValues(t, "HASH", table.KeySchema[0].KeyType)
+	assert.Equal(s.T(), "ACTIVE", string(table.TableStatus))
+	assert.Equal(s.T(), "LockID", *table.KeySchema[0].AttributeName)
+	assert.EqualValues(s.T(), "HASH", table.KeySchema[0].KeyType)
 
-			// Verify server-side encryption configuration
-			assert.NotEmpty(t, *table.SSEDescription.KMSMasterKeyArn)
-			assert.Equal(t, "ENABLED", string(table.SSEDescription.Status))
-			assert.Equal(t, "KMS", string(table.SSEDescription.SSEType))
+	// Verify server-side encryption configuration
+	assert.NotEmpty(s.T(), *table.SSEDescription.KMSMasterKeyArn)
+	assert.Equal(s.T(), "ENABLED", string(table.SSEDescription.Status))
+	assert.Equal(s.T(), "KMS", string(table.SSEDescription.SSEType))
 
-			// Verify TTL configuration
-			ttl := aws.GetDynamoDBTableTimeToLive(t, awsRegion, dynamodbTableID)
-			assert.Nil(t, ttl.AttributeName)
-			assert.Equal(t, "DISABLED", string(ttl.TimeToLiveStatus))
+	// Verify TTL configuration
+	ttl := aws.GetDynamoDBTableTimeToLive(s.T(), awsRegion, dynamodbTableID)
+	assert.Nil(s.T(), ttl.AttributeName)
+	assert.Equal(s.T(), "DISABLED", string(ttl.TimeToLiveStatus))
 
-			keys := make([]string, 0, len(accessRoleARNs))
-			for k := range accessRoleARNs {
-				keys = append(keys, k)
-			}
-			iamRoleName := keys[0]
+	keys := make([]string, 0, len(accessRoleARNs))
+	for k := range accessRoleARNs {
+		keys = append(keys, k)
+	}
+	iamRoleName := keys[0]
 
-			client := aws.NewIamClient(t, awsRegion)
-			describeRoleOutput, err := client.GetRole(context.Background(), &iam.GetRoleInput{
-				RoleName: &iamRoleName,
-			})
-			assert.NoError(t, err)
-
-			awsRole := describeRoleOutput.Role
-			assert.Equal(t, iamRoleName, *awsRole.RoleName)
-			assert.Equal(t, fmt.Sprintf("Access role for %s", bucketID), *awsRole.Description)
-
-			assert.EqualValues(t, 3600, *awsRole.MaxSessionDuration)
-			assert.Equal(t, "/", *awsRole.Path)
-		})
+	client := aws.NewIamClient(s.T(), awsRegion)
+	describeRoleOutput, err := client.GetRole(context.Background(), &iam.GetRoleInput{
+		RoleName: &iamRoleName,
 	})
+	assert.NoError(s.T(), err)
+
+	awsRole := describeRoleOutput.Role
+	assert.Equal(s.T(), iamRoleName, *awsRole.RoleName)
+	assert.Equal(s.T(), fmt.Sprintf("Access role for %s", bucketID), *awsRole.Description)
+
+	assert.EqualValues(s.T(), 3600, *awsRole.MaxSessionDuration)
+	assert.Equal(s.T(), "/", *awsRole.Path)
+}
+
+func (s *ComponentSuite) TestEnabledFlag() {
+	const component = "tfstate-bucket/disabled"
+	const stack = "default-test"
+	const awsRegion = "us-east-2"
+
+	s.VerifyEnabledFlag(component, stack, nil)
+}
+
+func TestRunSuite(t *testing.T) {
+	suite := new(ComponentSuite)
+	helper.Run(t, suite)
 }
