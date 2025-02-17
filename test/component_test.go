@@ -150,6 +150,8 @@ func (s *ComponentSuite) TestBasic() {
 
 	assert.EqualValues(s.T(), 3600, *awsRole.MaxSessionDuration)
 	assert.Equal(s.T(), "/", *awsRole.Path)
+
+	s.DriftTest(component, stack, nil)
 }
 
 func (s *ComponentSuite) TestEnabledFlag() {
