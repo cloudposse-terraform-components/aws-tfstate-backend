@@ -1,0 +1,22 @@
+components:
+  terraform:
+    tfstate-bucket/disabled:
+      metadata:
+        component: target
+      vars:
+        enabled: false
+        enable_server_side_encryption: true
+        force_destroy: false
+        name: tfstate
+        prevent_unencrypted_uploads: true
+        access_roles:
+          default: &tfstate-access-template
+            write_enabled: true
+            allowed_roles:
+              default-test: ["devops", "developers", "managers", "spacelift"]
+            denied_roles: {}
+            allowed_permission_sets:
+              default-test: ["AdministratorAccess"]
+            denied_permission_sets: {}
+            allowed_principal_arns: []
+            denied_principal_arns: []
