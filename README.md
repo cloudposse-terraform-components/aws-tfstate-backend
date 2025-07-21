@@ -146,6 +146,9 @@ terraform:
           denied_principal_arns: []
 ```
 
+<!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+
 
 > [!TIP]
 > #### 👽 Use Atmos with Terraform
@@ -166,32 +169,6 @@ terraform:
 
 
 
-
-<!-- markdownlint-disable -->
-## Requirements
-
-No requirements.
-
-## Providers
-
-No providers.
-
-## Modules
-
-No modules.
-
-## Resources
-
-No resources.
-
-## Inputs
-
-No inputs.
-
-## Outputs
-
-No outputs.
-<!-- markdownlint-restore -->
 
 
 ## Related Projects

@@ -122,8 +122,8 @@ description: |-
             denied_principal_arns: []
   ```
 
-include:
-  - docs/terraform.md
+  <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+  <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 
 tags:
   - component/tfstate-backend
