@@ -147,6 +147,8 @@ terraform:
 ```
 
 <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- prettier-ignore-start -->
+<!-- prettier-ignore-end -->
 <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
 
 
