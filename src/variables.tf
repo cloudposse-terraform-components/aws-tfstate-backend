@@ -15,12 +15,6 @@ variable "prevent_unencrypted_uploads" {
   default     = true
 }
 
-variable "enable_server_side_encryption" {
-  type        = bool
-  description = "Enable DynamoDB and S3 server-side encryption"
-  default     = true
-}
-
 variable "enable_point_in_time_recovery" {
   type        = bool
   description = "Enable DynamoDB point-in-time recovery"
@@ -49,4 +43,10 @@ variable "access_roles_enabled" {
     Note that the current caller and any `allowed_principal_arns` will always be allowed to assume the role.
     EOT
   default     = true
+}
+
+variable "dynamodb_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether to create the DynamoDB table."
 }

@@ -68,13 +68,16 @@ data "aws_iam_policy_document" "tfstate" {
     ]
   }
 
-  statement {
-    sid    = "TerraformStateBackendDynamoDbTable"
-    effect = "Allow"
-    # Even readers need to be able to write to the Dynamo table to lock the state while planning
-    # actions   = concat(["dynamodb:GetItem"], each.value.write_enabled ? ["dynamodb:PutItem", "dynamodb:DeleteItem"] : [])
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
-    resources = [module.tfstate_backend.dynamodb_table_arn]
+  dynamic "statement" {
+    for_each = var.dynamodb_enabled ? [1] : []
+    content {
+      sid    = "TerraformStateBackendDynamoDbTable"
+      effect = "Allow"
+      # Even readers need to be able to write to the Dynamo table to lock the state while planning
+      # actions   = concat(["dynamodb:GetItem"], each.value.write_enabled ? ["dynamodb:PutItem", "dynamodb:DeleteItem"] : [])
+      actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem"]
+      resources = [module.tfstate_backend.dynamodb_table_arn]
+    }
   }
 }
 
