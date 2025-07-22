@@ -122,10 +122,10 @@ description: |-
             denied_principal_arns: []
   ```
 
-  <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
   <!-- prettier-ignore-start -->
-  <!-- prettier-ignore-end -->
+  <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
   <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+  <!-- prettier-ignore-end -->
 
 tags:
   - component/tfstate-backend
