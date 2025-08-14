@@ -15,17 +15,17 @@ output "tfstate_backend_s3_bucket_arn" {
 
 output "tfstate_backend_dynamodb_table_name" {
   description = "Terraform state DynamoDB table name"
-  value       = var.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_name : ""
+  value       = local.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_name : ""
 }
 
 output "tfstate_backend_dynamodb_table_id" {
   description = "Terraform state DynamoDB table ID"
-  value       = var.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_id : ""
+  value       = local.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_id : ""
 }
 
 output "tfstate_backend_dynamodb_table_arn" {
   description = "Terraform state DynamoDB table ARN"
-  value       = var.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_arn : ""
+  value       = local.dynamodb_enabled ? module.tfstate_backend.dynamodb_table_arn : ""
 }
 
 output "tfstate_backend_access_role_arns" {

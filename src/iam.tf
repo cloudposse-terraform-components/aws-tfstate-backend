@@ -69,7 +69,7 @@ data "aws_iam_policy_document" "tfstate" {
   }
 
   dynamic "statement" {
-    for_each = var.dynamodb_enabled ? [1] : []
+    for_each = local.dynamodb_enabled ? [1] : []
     content {
       sid    = "TerraformStateBackendDynamoDbTable"
       effect = "Allow"
