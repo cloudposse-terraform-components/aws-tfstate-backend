@@ -50,3 +50,9 @@ variable "dynamodb_enabled" {
   default     = true
   description = "Whether to create the DynamoDB table."
 }
+
+variable "s3_state_lock_enabled" {
+  type        = bool
+  default     = false
+  description = "Whether to use S3 for state lock. If true, the DynamoDB table will not be created."
+}
