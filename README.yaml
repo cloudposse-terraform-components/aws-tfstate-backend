@@ -81,9 +81,7 @@ description: |-
   `us-east-1` region, regardless of what region you are deploying to. Normally 3072 characters is sufficient, and is
   recommended so that you still have room to expand the trust policy in the future while perhaps considering how to reduce
   its size.
-
-  ## Usage
-
+usage: |-
   **Stack Level**: Regional (because DynamoDB is region-specific), but deploy only in a single region and only in the
   `root` account **Deployment**: Must be deployed by SuperAdmin using `atmos` CLI
 
@@ -123,10 +121,14 @@ description: |-
   ```
 
   <!-- prettier-ignore-start -->
-  <!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
-  <!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
   <!-- prettier-ignore-end -->
-
+references:
+  - name: "Provision tfstate-backend component"
+    description: ""
+    url: "https://docs.cloudposse.com/layers/accounts/tutorials/manual-configuration/#provision-tfstate-backend-component"
+  - name: "Increase IAM role trust policy character limit"
+    description: ""
+    url: "https://us-east-1.console.aws.amazon.com/servicequotas/home/services/iam/quotas/L-C07B4B0D"
 tags:
   - component/tfstate-backend
   - layer/foundation

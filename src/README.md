@@ -86,7 +86,6 @@ this is the IAM limit on "The maximum number of characters in an IAM role trust 
 `us-east-1` region, regardless of what region you are deploying to. Normally 3072 characters is sufficient, and is
 recommended so that you still have room to expand the trust policy in the future while perhaps considering how to reduce
 its size.
-
 ## Usage
 
 **Stack Level**: Regional (because DynamoDB is region-specific), but deploy only in a single region and only in the
@@ -128,7 +127,10 @@ terraform:
 ```
 
 <!-- prettier-ignore-start -->
-<!-- BEGINNING OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
+<!-- prettier-ignore-end -->
+
+
+<!-- markdownlint-disable -->
 ## Requirements
 
 | Name | Version |
@@ -150,7 +152,7 @@ terraform:
 |------|--------|---------|
 | <a name="module_assume_role"></a> [assume\_role](#module\_assume\_role) | ../account-map/modules/team-assume-role-policy | n/a |
 | <a name="module_label"></a> [label](#module\_label) | cloudposse/label/null | 0.25.0 |
-| <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.6.0 |
+| <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.7.0 |
 | <a name="module_this"></a> [this](#module\_this) | cloudposse/label/null | 0.25.0 |
 
 ## Resources
@@ -206,12 +208,19 @@ terraform:
 | <a name="output_tfstate_backend_s3_bucket_arn"></a> [tfstate\_backend\_s3\_bucket\_arn](#output\_tfstate\_backend\_s3\_bucket\_arn) | Terraform state S3 bucket ARN |
 | <a name="output_tfstate_backend_s3_bucket_domain_name"></a> [tfstate\_backend\_s3\_bucket\_domain\_name](#output\_tfstate\_backend\_s3\_bucket\_domain\_name) | Terraform state S3 bucket domain name |
 | <a name="output_tfstate_backend_s3_bucket_id"></a> [tfstate\_backend\_s3\_bucket\_id](#output\_tfstate\_backend\_s3\_bucket\_id) | Terraform state S3 bucket ID |
-<!-- END OF PRE-COMMIT-TERRAFORM DOCS HOOK -->
-<!-- prettier-ignore-end -->
+<!-- markdownlint-restore -->
+
+
 
 ## References
 
-- [cloudposse/terraform-aws-components](https://github.com/cloudposse/terraform-aws-components/tree/main/modules/tfstate-backend) -
-  Cloud Posse's upstream component
+
+- [Provision tfstate-backend component](https://docs.cloudposse.com/layers/accounts/tutorials/manual-configuration/#provision-tfstate-backend-component) - 
+
+- [Increase IAM role trust policy character limit](https://us-east-1.console.aws.amazon.com/servicequotas/home/services/iam/quotas/L-C07B4B0D) - 
+
+
+
 
 [<img src="https://cloudposse.com/logo-300x69.svg" height="32" align="right"/>](https://cpco.io/homepage?utm_source=github&utm_medium=readme&utm_campaign=cloudposse-terraform-components/aws-tfstate-backend&utm_content=)
+
