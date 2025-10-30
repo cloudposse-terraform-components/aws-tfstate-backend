@@ -7,7 +7,7 @@ locals {
 
 module "tfstate_backend" {
   source  = "cloudposse/tfstate-backend/aws"
-  version = "1.7.0"
+  version = "1.7.1"
 
   enabled = local.enabled
 
