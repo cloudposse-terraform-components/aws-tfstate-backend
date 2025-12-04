@@ -1,0 +1,25 @@
+# Test case: use_organization_id = true (default)
+# This uses the AWS Organization ID condition in trust policies
+components:
+  terraform:
+    tfstate-bucket/with-org-id:
+      metadata:
+        component: target
+      vars:
+        enabled: true
+        enable_server_side_encryption: true
+        force_destroy: false
+        name: tfstate-orgid
+        prevent_unencrypted_uploads: true
+        use_organization_id: true
+        access_roles:
+          default:
+            write_enabled: true
+            allowed_roles:
+              default-test: ["admin", "terraform"]
+            denied_roles: {}
+            allowed_permission_sets:
+              default-test: ["AdministratorAccess"]
+            denied_permission_sets: {}
+            allowed_principal_arns: []
+            denied_principal_arns: []

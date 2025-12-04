@@ -249,6 +249,157 @@ func (s *ComponentSuite) TestStateLock() {
 	s.DriftTest(component, stack, nil)
 }
 
+// AssumeRolePolicy represents the structure of an IAM assume role policy document
+type AssumeRolePolicy struct {
+	Version   string `json:"Version"`
+	Statement []struct {
+		Sid       string      `json:"Sid,omitempty"`
+		Effect    string      `json:"Effect"`
+		Principal interface{} `json:"Principal"`
+		Action    interface{} `json:"Action"`
+		Condition struct {
+			StringEquals map[string]interface{} `json:"StringEquals,omitempty"`
+			ArnLike      map[string]interface{} `json:"ArnLike,omitempty"`
+		} `json:"Condition,omitempty"`
+	} `json:"Statement"`
+}
+
+// TestWithOrgID tests that use_organization_id=true uses the aws:PrincipalOrgID condition
+func (s *ComponentSuite) TestWithOrgID() {
+	const component = "tfstate-bucket/with-org-id"
+	const stack = "default-test"
+	const awsRegion = "us-east-2"
+
+	defer s.DestroyAtmosComponent(s.T(), component, stack, nil)
+	options, _ := s.DeployAtmosComponent(s.T(), component, stack, nil)
+	assert.NotNil(s.T(), options)
+
+	bucketID := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_id")
+	assert.NotEmpty(s.T(), bucketID)
+
+	accessRoleARNs := atmos.OutputMapOfObjects(s.T(), options, "tfstate_backend_access_role_arns")
+	assert.NotEmpty(s.T(), accessRoleARNs)
+
+	// Get the first role name
+	keys := make([]string, 0, len(accessRoleARNs))
+	for k := range accessRoleARNs {
+		keys = append(keys, k)
+	}
+	iamRoleName := keys[0]
+
+	// Get the role and its assume role policy
+	client := aws.NewIamClient(s.T(), awsRegion)
+	describeRoleOutput, err := client.GetRole(context.Background(), &iam.GetRoleInput{
+		RoleName: &iamRoleName,
+	})
+	assert.NoError(s.T(), err)
+
+	// Parse the assume role policy
+	var assumeRolePolicy AssumeRolePolicy
+	err = json.Unmarshal([]byte(*describeRoleOutput.Role.AssumeRolePolicyDocument), &assumeRolePolicy)
+	assert.NoError(s.T(), err)
+
+	// Verify that at least one statement has aws:PrincipalOrgID condition
+	hasOrgIDCondition := false
+	hasPrincipalWildcard := false
+	for _, statement := range assumeRolePolicy.Statement {
+		if statement.Effect == "Allow" {
+			// Check for aws:PrincipalOrgID condition
+			if orgID, ok := statement.Condition.StringEquals["aws:PrincipalOrgID"]; ok && orgID != nil {
+				hasOrgIDCondition = true
+			}
+			// Check if principal is "*" (wildcard)
+			if principal, ok := statement.Principal.(string); ok && principal == "*" {
+				hasPrincipalWildcard = true
+			}
+			if principalMap, ok := statement.Principal.(map[string]interface{}); ok {
+				if aws, ok := principalMap["AWS"]; ok {
+					if awsStr, ok := aws.(string); ok && awsStr == "*" {
+						hasPrincipalWildcard = true
+					}
+				}
+			}
+		}
+	}
+
+	assert.True(s.T(), hasOrgIDCondition, "Expected trust policy to have aws:PrincipalOrgID condition when use_organization_id=true")
+	assert.True(s.T(), hasPrincipalWildcard, "Expected trust policy to have wildcard principal when use_organization_id=true")
+
+	s.DriftTest(component, stack, nil)
+}
+
+// TestWithoutOrgID tests that use_organization_id=false lists individual account roots
+func (s *ComponentSuite) TestWithoutOrgID() {
+	const component = "tfstate-bucket/without-org-id"
+	const stack = "default-test"
+	const awsRegion = "us-east-2"
+
+	defer s.DestroyAtmosComponent(s.T(), component, stack, nil)
+	options, _ := s.DeployAtmosComponent(s.T(), component, stack, nil)
+	assert.NotNil(s.T(), options)
+
+	bucketID := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_id")
+	assert.NotEmpty(s.T(), bucketID)
+
+	accessRoleARNs := atmos.OutputMapOfObjects(s.T(), options, "tfstate_backend_access_role_arns")
+	assert.NotEmpty(s.T(), accessRoleARNs)
+
+	// Get the first role name
+	keys := make([]string, 0, len(accessRoleARNs))
+	for k := range accessRoleARNs {
+		keys = append(keys, k)
+	}
+	iamRoleName := keys[0]
+
+	// Get the role and its assume role policy
+	client := aws.NewIamClient(s.T(), awsRegion)
+	describeRoleOutput, err := client.GetRole(context.Background(), &iam.GetRoleInput{
+		RoleName: &iamRoleName,
+	})
+	assert.NoError(s.T(), err)
+
+	// Parse the assume role policy
+	var assumeRolePolicy AssumeRolePolicy
+	err = json.Unmarshal([]byte(*describeRoleOutput.Role.AssumeRolePolicyDocument), &assumeRolePolicy)
+	assert.NoError(s.T(), err)
+
+	// Verify that no statement has aws:PrincipalOrgID condition
+	// and that principals are account root ARNs (not wildcards)
+	hasOrgIDCondition := false
+	hasAccountRootPrincipal := false
+	for _, statement := range assumeRolePolicy.Statement {
+		if statement.Effect == "Allow" {
+			// Check that there's no aws:PrincipalOrgID condition
+			if orgID, ok := statement.Condition.StringEquals["aws:PrincipalOrgID"]; ok && orgID != nil {
+				hasOrgIDCondition = true
+			}
+			// Check if principal contains account root ARN pattern
+			if principalMap, ok := statement.Principal.(map[string]interface{}); ok {
+				if aws, ok := principalMap["AWS"]; ok {
+					// Could be a string or array
+					switch v := aws.(type) {
+					case string:
+						if strings.Contains(v, ":root") {
+							hasAccountRootPrincipal = true
+						}
+					case []interface{}:
+						for _, p := range v {
+							if pStr, ok := p.(string); ok && strings.Contains(pStr, ":root") {
+								hasAccountRootPrincipal = true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	assert.False(s.T(), hasOrgIDCondition, "Expected trust policy to NOT have aws:PrincipalOrgID condition when use_organization_id=false")
+	assert.True(s.T(), hasAccountRootPrincipal, "Expected trust policy to have account root ARN principals when use_organization_id=false")
+
+	s.DriftTest(component, stack, nil)
+}
+
 func TestRunSuite(t *testing.T) {
 	suite := new(ComponentSuite)
 	helper.Run(t, suite)

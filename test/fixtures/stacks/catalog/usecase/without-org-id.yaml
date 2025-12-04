@@ -1,0 +1,25 @@
+# Test case: use_organization_id = false
+# This lists individual account root ARNs in trust policies instead of using org ID condition
+components:
+  terraform:
+    tfstate-bucket/without-org-id:
+      metadata:
+        component: target
+      vars:
+        enabled: true
+        enable_server_side_encryption: true
+        force_destroy: false
+        name: tfstate-no-orgid
+        prevent_unencrypted_uploads: true
+        use_organization_id: false
+        access_roles:
+          default:
+            write_enabled: true
+            allowed_roles:
+              default-test: ["admin", "terraform"]
+            denied_roles: {}
+            allowed_permission_sets:
+              default-test: ["AdministratorAccess"]
+            denied_permission_sets: {}
+            allowed_principal_arns: []
+            denied_principal_arns: []
