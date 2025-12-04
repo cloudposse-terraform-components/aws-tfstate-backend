@@ -1,5 +1,7 @@
 # Changelog
 
+## Remove `account-map` dependency ([#54](https://github.com/cloudposse-terraform-components/aws-tfstate-backend/pull/54))
+
 ### Summary
 
 This release removes the dependency on the `account-map` component as part of a larger effort to deprecate `account-map`. Previously, this component was tightly coupled with `account-map` because it used the `team-assume-role-policy` submodule from `account-map` to generate IAM trust policies. This change internalizes that functionality directly into the `tfstate-backend` component, eliminating the dependency.
