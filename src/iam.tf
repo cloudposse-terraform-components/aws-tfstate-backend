@@ -15,14 +15,14 @@ locals {
   # to the IAM Role ARN, like
   #    arn:aws:iam::123456789012:role/acme-core-gbl-root-admin
   caller_arn = coalesce(data.awsutils_caller_identity.current.eks_role_arn, data.awsutils_caller_identity.current.arn)
+
+  # IAM role ARN template for constructing role ARNs from role names
+  # Format: namespace-environment-stage-name-{role_name}
+  iam_role_arn_template = "${module.this.namespace}-${module.this.environment}-${module.this.stage}-${module.this.name}-%s"
 }
 
 data "awsutils_caller_identity" "current" {}
 data "aws_partition" "current" {}
-data "aws_organizations_organization" "current" {
-  count = var.use_organization_id ? 1 : 0
-}
-
 
 module "label" {
   for_each = local.enabled ? var.access_roles : {}
@@ -39,299 +39,23 @@ module "label" {
   context = module.this.context
 }
 
-# Build role ARN patterns from account IDs and role names
-locals {
-  # Helper map to convert account name/ID to account ID
-  # If the key is already an account ID (numeric), use it as-is
-  # Otherwise, look it up in the account_map
-  to_account_id = try(var.account_map.full_account_map, {})
-
-  # Convert account name/ID to account ID
-  # Returns the account ID if the input is numeric (already an ID), otherwise looks it up in account_map
-  # If account_map is not provided or account name not found, returns the key as-is (which will cause an error later)
-  get_account_id = { for account_key in distinct(flatten([
-    for role_config in values(local.access_roles) : concat(
-      keys(role_config.allowed_roles),
-      keys(role_config.denied_roles),
-      keys(try(role_config.allowed_permission_sets, {})),
-      keys(try(role_config.denied_permission_sets, {}))
-    )
-    ])) : account_key => (
-    can(regex("^[0-9]{12}$", account_key)) ? account_key : (
-      lookup(local.to_account_id, account_key, account_key)
-    )
-  ) }
-
-  # Convert allowed_roles map (account_name/id -> [role_names]) to ARN patterns
-  allowed_role_arns = {
-    for role_key, role_config in local.access_roles : role_key => distinct(flatten([
-      for account_key, role_names in role_config.allowed_roles : [
-        for role_name in role_names : (
-          role_name == "*" ?
-          format("arn:%s:iam::%s:role/*", data.aws_partition.current.partition, local.get_account_id[account_key]) :
-          format("arn:%s:iam::%s:role/%s-%s-%s-%s-%s", data.aws_partition.current.partition, local.get_account_id[account_key],
-          module.this.namespace, module.this.environment, module.this.stage, module.this.name, role_name)
-        )
-      ]
-    ]))
-  }
-
-  # Convert denied_roles map (account_name/id -> [role_names]) to ARN patterns
-  denied_role_arns = {
-    for role_key, role_config in local.access_roles : role_key => distinct(flatten([
-      for account_key, role_names in role_config.denied_roles : [
-        for role_name in role_names : (
-          role_name == "*" ?
-          format("arn:%s:iam::%s:role/*", data.aws_partition.current.partition, local.get_account_id[account_key]) :
-          format("arn:%s:iam::%s:role/%s-%s-%s-%s-%s", data.aws_partition.current.partition, local.get_account_id[account_key],
-          module.this.namespace, module.this.environment, module.this.stage, module.this.name, role_name)
-        )
-      ]
-    ]))
-  }
-
-  # Convert allowed_permission_sets map (account_name/id -> [permission_set_names]) to ARN patterns
-  # AWS SSO permission set IAM role ARN format: arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/REGION/AWSReservedSSO_PERMISSION_SET_NAME_ID
-  # The * wildcard matches the region path (e.g., /us-east-2) and the permission set instance ID suffix
-  allowed_permission_set_arns = {
-    for role_key, role_config in local.access_roles : role_key => distinct(flatten([
-      for account_key, permission_sets in try(role_config.allowed_permission_sets, {}) : [
-        for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_%s_*",
-        data.aws_partition.current.partition, local.get_account_id[account_key], ps_name)
-      ]
-    ]))
-  }
-
-  # Convert denied_permission_sets map (account_name/id -> [permission_set_names]) to ARN patterns
-  denied_permission_set_arns = {
-    for role_key, role_config in local.access_roles : role_key => distinct(flatten([
-      for account_key, permission_sets in try(role_config.denied_permission_sets, {}) : [
-        for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_%s_*",
-        data.aws_partition.current.partition, local.get_account_id[account_key], ps_name)
-      ]
-    ]))
-  }
-
-  # Extract account IDs from allowed_roles and allowed_permission_sets (after conversion)
-  allowed_account_ids_from_roles = {
-    for role_key, role_config in local.access_roles : role_key => distinct([
-      for account_key in concat(
-        keys(role_config.allowed_roles),
-        keys(try(role_config.allowed_permission_sets, {}))
-      ) : local.get_account_id[account_key]
-    ])
-  }
-
-  # Extract account IDs from denied_roles and denied_permission_sets (after conversion)
-  denied_account_ids = {
-    for role_key, role_config in local.access_roles : role_key => distinct([
-      for account_key in concat(
-        keys(role_config.denied_roles),
-        keys(try(role_config.denied_permission_sets, {}))
-      ) : local.get_account_id[account_key]
-    ])
-  }
-
-  # Parse ARNs for allowed principals to extract account IDs
-  allowed_principal_accounts = {
-    for role_key, role_config in local.access_roles : role_key => distinct([
-      for arn in distinct(concat(role_config.allowed_principal_arns, [local.caller_arn])) : data.aws_arn.allowed_principals["${role_key}:${replace(arn, ":", "-")}"].account
-    ])
-  }
-
-  # Combined denied principals (ARNs + role ARNs + permission set ARNs)
-  denied_principals_combined = {
-    for role_key, role_config in local.access_roles : role_key => distinct(concat(
-      role_config.denied_principal_arns,
-      try(local.denied_role_arns[role_key], []),
-      try(local.denied_permission_set_arns[role_key], [])
-    ))
-  }
-
-  # Principals that are allowed but not denied (exceptions to deny rule)
-  undenied_principals = {
-    for role_key, role_config in local.access_roles : role_key => distinct(tolist(setsubtract(
-      toset(distinct(concat(role_config.allowed_principal_arns, [local.caller_arn]))),
-      toset(role_config.denied_principal_arns)
-    )))
-  }
-}
-
-# Parse ARNs for allowed principals
-data "aws_arn" "allowed_principals" {
-  for_each = {
-    for pair in flatten([
-      for role_key, role_config in local.access_roles : [
-        for arn in distinct(concat(role_config.allowed_principal_arns, [local.caller_arn])) : {
-          key = "${role_key}:${replace(arn, ":", "-")}"
-          arn = arn
-        }
-      ]
-    ]) : pair.key => pair.arn
-  }
-  arn = each.value
-}
-
-# Trust policy document that replaces the account-map module dependency
-data "aws_iam_policy_document" "assume_role" {
+# Use the assume-role-policy submodule to generate trust policies
+module "assume_role" {
   for_each = local.access_roles_enabled ? local.access_roles : {}
+  source   = "./modules/assume-role-policy"
 
-  # Statement 1: Allow roles from specified accounts
-  dynamic "statement" {
-    for_each = length(local.allowed_account_ids_from_roles[each.key]) > 0 && length(local.allowed_role_arns[each.key]) > 0 ? [1] : []
-    content {
-      sid    = "RoleAssumeRole"
-      effect = "Allow"
-      actions = [
-        "sts:AssumeRole",
-        "sts:SetSourceIdentity",
-        "sts:TagSession",
-      ]
+  allowed_roles           = each.value.allowed_roles
+  denied_roles            = each.value.denied_roles
+  allowed_principal_arns  = distinct(concat(each.value.allowed_principal_arns, [local.caller_arn]))
+  denied_principal_arns   = each.value.denied_principal_arns
+  allowed_permission_sets = try(each.value.allowed_permission_sets, {})
+  denied_permission_sets  = try(each.value.denied_permission_sets, {})
 
-      dynamic "condition" {
-        for_each = var.use_organization_id ? [1] : []
-        content {
-          test     = "StringEquals"
-          variable = "aws:PrincipalOrgID"
-          values   = [data.aws_organizations_organization.current[0].id]
-        }
-      }
-      condition {
-        test     = "StringEquals"
-        variable = "aws:PrincipalType"
-        values   = ["AssumedRole"]
-      }
-      condition {
-        test     = "ArnLike"
-        variable = "aws:PrincipalArn"
-        values   = local.allowed_role_arns[each.key]
-      }
+  account_map           = var.account_map
+  use_organization_id   = var.use_organization_id
+  iam_role_arn_template = local.iam_role_arn_template
 
-      principals {
-        type        = "AWS"
-        identifiers = var.use_organization_id ? ["*"] : formatlist("arn:%s:iam::%s:root", data.aws_partition.current.partition, local.allowed_account_ids_from_roles[each.key])
-      }
-    }
-  }
-
-  # Statement 2: Allow permission sets from specified accounts
-  dynamic "statement" {
-    for_each = length(local.allowed_account_ids_from_roles[each.key]) > 0 && length(local.allowed_permission_set_arns[each.key]) > 0 ? [1] : []
-    content {
-      sid    = "PermissionSetAssumeRole"
-      effect = "Allow"
-      actions = [
-        "sts:AssumeRole",
-        "sts:SetSourceIdentity",
-        "sts:TagSession",
-      ]
-
-      dynamic "condition" {
-        for_each = var.use_organization_id ? [1] : []
-        content {
-          test     = "StringEquals"
-          variable = "aws:PrincipalOrgID"
-          values   = [data.aws_organizations_organization.current[0].id]
-        }
-      }
-      condition {
-        test     = "StringEquals"
-        variable = "aws:PrincipalType"
-        values   = ["AssumedRole"]
-      }
-      condition {
-        test     = "ArnLike"
-        variable = "aws:PrincipalArn"
-        values   = local.allowed_permission_set_arns[each.key]
-      }
-
-      principals {
-        type        = "AWS"
-        identifiers = var.use_organization_id ? ["*"] : formatlist("arn:%s:iam::%s:root", data.aws_partition.current.partition, local.allowed_account_ids_from_roles[each.key])
-      }
-    }
-  }
-
-  # Statement 3: Allow explicit principal ARNs
-  dynamic "statement" {
-    for_each = length(local.allowed_principal_accounts[each.key]) > 0 && length(distinct(concat(each.value.allowed_principal_arns, [local.caller_arn]))) > 0 ? [1] : []
-    content {
-      sid    = "PrincipalAssumeRole"
-      effect = "Allow"
-      actions = [
-        "sts:AssumeRole",
-        "sts:SetSourceIdentity",
-        "sts:TagSession",
-      ]
-
-      dynamic "condition" {
-        for_each = var.use_organization_id ? [1] : []
-        content {
-          test     = "StringEquals"
-          variable = "aws:PrincipalOrgID"
-          values   = [data.aws_organizations_organization.current[0].id]
-        }
-      }
-
-      condition {
-        test     = "ArnLike"
-        variable = "aws:PrincipalArn"
-        values   = distinct(concat(each.value.allowed_principal_arns, [local.caller_arn]))
-      }
-
-      principals {
-        type        = "AWS"
-        identifiers = var.use_organization_id ? ["*"] : formatlist("arn:%s:iam::%s:root", data.aws_partition.current.partition, local.allowed_principal_accounts[each.key])
-      }
-    }
-  }
-
-  # Statement 4: Deny explicitly denied principals, roles, and permission sets
-  # Only create this statement if there are actually denied principals
-  dynamic "statement" {
-    for_each = length(local.denied_principals_combined[each.key]) > 0 ? [1] : []
-    content {
-      sid    = "RoleDenyAssumeRole"
-      effect = "Deny"
-      actions = [
-        "sts:AssumeRole",
-        "sts:SetSourceIdentity",
-        "sts:TagSession",
-      ]
-
-      dynamic "condition" {
-        for_each = var.use_organization_id ? [1] : []
-        content {
-          test     = "StringEquals"
-          variable = "aws:PrincipalOrgID"
-          values   = [data.aws_organizations_organization.current[0].id]
-        }
-      }
-      condition {
-        test     = "ArnLike"
-        variable = "aws:PrincipalArn"
-        values   = local.denied_principals_combined[each.key]
-      }
-
-      dynamic "condition" {
-        for_each = length(local.undenied_principals[each.key]) > 0 ? [1] : []
-        content {
-          test     = "ArnNotEquals"
-          variable = "aws:PrincipalArn"
-          values   = local.undenied_principals[each.key]
-        }
-      }
-
-      principals {
-        type = "AWS"
-        identifiers = var.use_organization_id ? ["*"] : formatlist("arn:%s:iam::%s:root", data.aws_partition.current.partition, distinct(concat(
-          local.allowed_account_ids_from_roles[each.key],
-          local.allowed_principal_accounts[each.key],
-          local.denied_account_ids[each.key]
-        )))
-      }
-    }
-  }
+  context = module.this.context
 }
 
 data "aws_iam_policy_document" "tfstate" {
@@ -365,7 +89,7 @@ resource "aws_iam_role" "default" {
 
   name               = each.key
   description        = "${each.value.write_enabled ? "Access" : "Read-only access"} role for ${module.this.id}"
-  assume_role_policy = var.access_roles_enabled ? data.aws_iam_policy_document.assume_role[each.key].json : data.aws_iam_policy_document.cold_start_assume_role[each.key].json
+  assume_role_policy = var.access_roles_enabled ? module.assume_role[each.key].policy_document : data.aws_iam_policy_document.cold_start_assume_role[each.key].json
   tags               = merge(module.this.tags, { Name = each.key })
 }
 
@@ -377,6 +101,8 @@ resource "aws_iam_role_policy" "default" {
   policy = data.aws_iam_policy_document.tfstate[each.key].json
 }
 
+# Cold start access policy - used when access_roles_enabled is false
+# This allows the caller and explicitly allowed principals to assume the role during initial setup
 locals {
   all_cold_start_access_principals = local.cold_start_access_enabled ? toset(concat([local.caller_arn],
   flatten([for k, v in local.access_roles : v.allowed_principal_arns]))) : toset([])
@@ -388,12 +114,15 @@ locals {
       for arn in v : data.aws_arn.cold_start_access[arn].account
     ]))
   } : {}
-
 }
 
 data "aws_arn" "cold_start_access" {
   for_each = local.all_cold_start_access_principals
   arn      = each.value
+}
+
+data "aws_organizations_organization" "current" {
+  count = local.cold_start_access_enabled && var.use_organization_id ? 1 : 0
 }
 
 # This is a basic policy that allows the caller and explicitly allowed principals to assume the role
@@ -405,7 +134,7 @@ data "aws_iam_policy_document" "cold_start_assume_role" {
     sid = "ColdStartRoleAssumeRole"
 
     effect = "Allow"
-    # These actions need to be kept in sync with the actions in the assume_role policy document
+    # These actions need to be kept in sync with the actions in the assume_role module
     actions = [
       "sts:AssumeRole",
       "sts:SetSourceIdentity",
