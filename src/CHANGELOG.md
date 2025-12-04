@@ -2,13 +2,13 @@
 
 ### Summary
 
-This release removes the dependency on the `account-map` component's remote state. The `tfstate-backend` component now generates IAM assume role policies internally, enabling it to be deployed earlier in the bootstrap process before `account-map` is available.
+This release removes the dependency on the `account-map` component as part of a larger effort to deprecate `account-map`. Previously, this component was tightly coupled with `account-map` because it used the `team-assume-role-policy` submodule from `account-map` to generate IAM trust policies. This change internalizes that functionality directly into the `tfstate-backend` component, eliminating the dependency.
 
 This change is backwards compatible. Existing deployments should continue to work without modification.
 
 ### New Features
 
-- **Removed `account-map` remote state dependency**: The component no longer requires the `account-map` component to be deployed or queries its remote state. The assume role policy logic has been internalized.
+- **Removed `account-map` dependency**: The component no longer uses the `account-map` submodule for generating assume role policies. All trust policy logic has been moved into a new internal `assume-role-policy` submodule at `modules/assume-role-policy`.
 
 - **Static account map support**: Added `account_map` variable to provide account name-to-ID mappings directly. Account names in `allowed_roles`, `denied_roles`, `allowed_permission_sets`, and `denied_permission_sets` can be resolved using this static map.
 
@@ -17,8 +17,6 @@ This change is backwards compatible. Existing deployments should continue to wor
 - **Permission set support in access roles**: Added `allowed_permission_sets` and `denied_permission_sets` to `access_roles` configuration, enabling AWS SSO permission sets to be granted or denied access to the Terraform state backend roles.
 
 - **Organization ID trust policy optimization**: Added `use_organization_id` variable (default: `true`) to use `aws:PrincipalOrgID` condition in trust policies instead of listing individual account root ARNs. This addresses the IAM trust policy size limit (4096 characters) which can be exceeded in organizations with many accounts.
-
-- **Extracted `assume-role-policy` submodule**: Created a reusable submodule at `modules/assume-role-policy` that generates IAM trust policy documents independently without remote state dependencies.
 
 ### Notes
 
