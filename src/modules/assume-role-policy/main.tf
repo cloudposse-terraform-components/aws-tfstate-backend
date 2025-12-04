@@ -6,8 +6,8 @@ locals {
 
   # Helper map to convert account name/ID to account ID
   # If the key is already an account ID (numeric), use it as-is
-  # Otherwise, look it up in the account_map
-  to_account_id = try(var.account_map.full_account_map, {})
+  # Otherwise, look it up in the account_map (only if account_map_enabled is true)
+  to_account_id = var.account_map_enabled ? try(var.account_map.full_account_map, {}) : {}
 
   # Collect all account keys referenced in any of the role/permission set maps
   all_account_keys = distinct(flatten([

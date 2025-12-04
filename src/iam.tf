@@ -51,6 +51,7 @@ module "assume_role" {
   allowed_permission_sets = try(each.value.allowed_permission_sets, {})
   denied_permission_sets  = try(each.value.denied_permission_sets, {})
 
+  account_map_enabled   = var.account_map_enabled
   account_map           = var.account_map
   use_organization_id   = var.use_organization_id
   iam_role_arn_template = local.iam_role_arn_template

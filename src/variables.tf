@@ -80,21 +80,3 @@ variable "use_organization_id" {
   EOT
   default     = true
 }
-
-variable "account_map" {
-  type = object({
-    full_account_map           = map(string)
-    audit_account_account_name = optional(string, "")
-    root_account_account_name  = optional(string, "")
-  })
-  description = <<-EOT
-    Static account map for resolving account names to account IDs.
-    Used by `access_roles` when account names are specified instead of account IDs.
-    This replaces the account-map component dependency.
-    EOT
-  default = {
-    full_account_map           = {}
-    audit_account_account_name = ""
-    root_account_account_name  = ""
-  }
-}
