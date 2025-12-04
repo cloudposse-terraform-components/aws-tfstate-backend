@@ -74,9 +74,16 @@ variable "s3_state_lock_enabled" {
 variable "use_organization_id" {
   type        = bool
   description = <<-EOT
-    If `true`, use AWS Organization ID in trust policy principals instead of listing individual account roots.
-    This significantly reduces the trust policy size and is recommended when you have many accounts.
-    If `false`, list each account root individually in the principals list.
+    If `true`, use AWS Organization ID (`aws:PrincipalOrgID` condition) in trust policies instead of
+    listing individual account root ARNs. When enabled, the principal is set to `*` and access is
+    restricted to the AWS Organization via a condition.
+
+    This is recommended (and often required) when you have many accounts because IAM trust policies
+    have a maximum size limit of 4096 characters. Listing each account root ARN individually can
+    easily exceed this limit in organizations with more than ~30 accounts.
+
+    If `false`, each account root is listed individually in the principals block, which may hit
+    the trust policy size limit in larger organizations.
   EOT
   default     = true
 }

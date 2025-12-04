@@ -17,8 +17,8 @@ locals {
   caller_arn = coalesce(data.awsutils_caller_identity.current.eks_role_arn, data.awsutils_caller_identity.current.arn)
 
   # IAM role ARN template for constructing role ARNs from role names
-  # Format: namespace-environment-stage-name-{role_name}
-  iam_role_arn_template = "${module.this.namespace}-${module.this.environment}-${module.this.stage}-${module.this.name}-%s"
+  # Format: {id}-{role_name} (e.g., acme-gbl-root-tfstate-admin)
+  iam_role_arn_template = "${module.this.id}-%s"
 }
 
 data "awsutils_caller_identity" "current" {}
