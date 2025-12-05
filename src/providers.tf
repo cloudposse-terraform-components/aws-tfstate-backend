@@ -31,14 +31,14 @@ variable "account_map" {
 
 variable "account_map_environment" {
   type        = string
-  description = "The environment where the account-map component is deployed (for remote state lookup)"
-  default     = "gbl"
+  description = "The environment where the account-map component is deployed (for remote state lookup). Leave null to use the current environment."
+  default     = null
 }
 
 variable "account_map_stage" {
   type        = string
-  description = "The stage where the account-map component is deployed (for remote state lookup)"
-  default     = "root"
+  description = "The stage where the account-map component is deployed (for remote state lookup). Leave null to use the current stage."
+  default     = null
 }
 
 variable "account_map_tenant" {

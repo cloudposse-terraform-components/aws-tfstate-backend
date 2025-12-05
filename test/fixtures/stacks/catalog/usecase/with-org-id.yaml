@@ -12,13 +12,6 @@ components:
         name: tfstate-orgid
         prevent_unencrypted_uploads: true
         use_organization_id: true
-        # Use static account_map to bypass remote state lookup
-        account_map_enabled: false
-        account_map:
-          full_account_map:
-            default-test: '{{ getenv "TEST_ACCOUNT_ID" | default "<TEST_ACCOUNT_ID>" }}'
-          audit_account_account_name: default-test
-          root_account_account_name: default-test
         access_roles:
           default:
             write_enabled: true

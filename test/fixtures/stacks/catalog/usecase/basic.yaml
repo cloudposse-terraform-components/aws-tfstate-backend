@@ -9,13 +9,6 @@ components:
         force_destroy: false
         name: tfstate
         prevent_unencrypted_uploads: true
-        # Use static account_map to bypass remote state lookup
-        account_map_enabled: false
-        account_map:
-          full_account_map:
-            default-test: '{{ getenv "TEST_ACCOUNT_ID" | default "<TEST_ACCOUNT_ID>" }}'
-          audit_account_account_name: default-test
-          root_account_account_name: default-test
         access_roles:
           default: &tfstate-access-template
             write_enabled: true
