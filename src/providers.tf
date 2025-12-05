@@ -5,9 +5,9 @@ provider "aws" {
 variable "account_map_enabled" {
   type        = bool
   description = <<-EOT
-    Enable account map lookups for resolving account names to account IDs.
-    When `true`, uses the `account_map` variable to resolve account names.
-    When `false`, account IDs must be provided directly in `access_roles`.
+    When true, uses the account-map component to look up account IDs dynamically.
+    When false, uses the static account_map variable instead. Set to false when
+    using static account mappings without the account-map component.
   EOT
   default     = true
 }
@@ -19,13 +19,30 @@ variable "account_map" {
     root_account_account_name  = optional(string, "")
   })
   description = <<-EOT
-    Static account map for resolving account names to account IDs.
-    Used by `access_roles` when account names are specified instead of account IDs.
-    This replaces the account-map component dependency.
+    Static account map used when account_map_enabled is false.
+    Provides account name to account ID mapping without requiring the account-map component.
   EOT
   default = {
     full_account_map           = {}
     audit_account_account_name = ""
     root_account_account_name  = ""
   }
+}
+
+variable "account_map_environment" {
+  type        = string
+  description = "The environment where the account-map component is deployed (for remote state lookup)"
+  default     = "gbl"
+}
+
+variable "account_map_stage" {
+  type        = string
+  description = "The stage where the account-map component is deployed (for remote state lookup)"
+  default     = "root"
+}
+
+variable "account_map_tenant" {
+  type        = string
+  description = "The tenant where the account-map component is deployed (for remote state lookup). Leave empty to use the current tenant."
+  default     = null
 }
