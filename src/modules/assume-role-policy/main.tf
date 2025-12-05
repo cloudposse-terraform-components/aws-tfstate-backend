@@ -17,13 +17,28 @@ locals {
     keys(var.denied_permission_sets)
   ]))
 
+  # Validate that all account keys are either 12-digit account IDs or exist in the account_map
+  # This prevents silent failures where unmapped account names produce invalid ARNs
+  invalid_account_keys = [
+    for key in local.all_account_keys : key
+    if !can(regex("^[0-9]{12}$", key)) && !contains(keys(local.to_account_id), key)
+  ]
+
+  # This will cause a plan-time error if any invalid keys are found
+  validate_account_keys = (
+    length(local.invalid_account_keys) == 0 ? true : tobool(
+      "Invalid account keys found: [${join(", ", local.invalid_account_keys)}]. " +
+      "Each key must be either a 12-digit AWS account ID or a valid account name in account_map.full_account_map. " +
+      "If using account names, ensure account_map_enabled=true and the account_map variable contains mappings for all account names."
+    )
+  )
+
   # Convert account name/ID to account ID
   # Returns the account ID if the input is numeric (already an ID), otherwise looks it up in account_map
-  get_account_id = { for account_key in local.all_account_keys : account_key => (
-    can(regex("^[0-9]{12}$", account_key)) ? account_key : (
-      lookup(local.to_account_id, account_key, account_key)
-    )
-  ) }
+  # The validation check is included in the condition to ensure it runs before any lookups
+  get_account_id = local.validate_account_keys ? { for account_key in local.all_account_keys : account_key => (
+    can(regex("^[0-9]{12}$", account_key)) ? account_key : local.to_account_id[account_key]
+  ) } : {}
 
   # Convert allowed_roles map (account_name/id -> [role_names]) to ARN patterns
   allowed_role_arns = local.enabled ? distinct(flatten([
