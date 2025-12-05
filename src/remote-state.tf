@@ -13,7 +13,7 @@ module "account_map" {
   version = "1.8.0"
 
   component   = "account-map"
-  tenant      = var.account_map_enabled ? coalesce(var.account_map_tenant, module.this.tenant) : null
+  tenant      = var.account_map_enabled ? (var.account_map_tenant != null ? var.account_map_tenant : module.this.tenant) : null
   environment = var.account_map_enabled ? var.account_map_environment : null
   stage       = var.account_map_enabled ? var.account_map_stage : null
 
