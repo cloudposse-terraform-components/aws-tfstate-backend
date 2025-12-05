@@ -36,7 +36,6 @@ terraform:
 components:
   terraform:
     account-map:
-      vars: {}
       remote_state_backend:
         static:
           account_info_map:
@@ -65,8 +64,3 @@ components:
           root_account_account_name: default-test
           terraform_roles:
             default-test: ''
-    # Default settings for tfstate-backend component tests
-    # Uses account-map component via remote state lookup (account_map_enabled defaults to true)
-    # account_map lookup now uses current context (environment/stage) by default
-    target:
-      vars: {}

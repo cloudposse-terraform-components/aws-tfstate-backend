@@ -1,7 +1,13 @@
 components:
   terraform:
     account-map:
-      vars: {}
+      metadata:
+        terraform_workspace: core-gbl-root
+      vars:
+        tenant: core
+        environment: gbl
+        stage: root
+
 #      This remote state is only for Cloud Posse internal use.
 #      It references the Cloud Posse test organizations actual infrastructure.
 #      remote_state_backend:
