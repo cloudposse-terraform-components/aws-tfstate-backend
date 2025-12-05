@@ -10,9 +10,6 @@ components:
         force_destroy: false
         name: tfstate
         prevent_unencrypted_uploads: true
-        account_map:
-          full_account_map:
-            default-test: '{{ getenv "TEST_ACCOUNT_ID" | default "<TEST_ACCOUNT_ID>" }}'
         access_roles:
           default: &tfstate-access-template
             write_enabled: true
