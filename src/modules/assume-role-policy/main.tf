@@ -1,4 +1,4 @@
-# This module generates an IAM assume role policy document without depending on account-map remote state.
+# This module generates an IAM assume role policy document.
 # It accepts pre-resolved account IDs via the account_map variable, or account IDs can be specified directly.
 
 locals {
@@ -6,8 +6,8 @@ locals {
 
   # Helper map to convert account name/ID to account ID
   # If the key is already an account ID (numeric), use it as-is
-  # Otherwise, look it up in the account_map (only if account_map_enabled is true)
-  to_account_id = var.account_map_enabled ? try(var.account_map.full_account_map, {}) : {}
+  # Otherwise, look it up in the account_map
+  to_account_id = try(var.account_map.full_account_map, {})
 
   # Collect all account keys referenced in any of the role/permission set maps
   all_account_keys = distinct(flatten([
@@ -28,8 +28,7 @@ locals {
   validate_account_keys = (
     length(local.invalid_account_keys) == 0 ? true : tobool(
       "Invalid account keys found: [${join(", ", local.invalid_account_keys)}]. " +
-      "Each key must be either a 12-digit AWS account ID or a valid account name in account_map.full_account_map. " +
-      "If using account names, ensure account_map_enabled=true and the account_map variable contains mappings for all account names."
+      "Each key must be either a 12-digit AWS account ID or a valid account name in account_map.full_account_map."
     )
   )
 

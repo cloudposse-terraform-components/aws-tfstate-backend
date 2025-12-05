@@ -71,16 +71,6 @@ variable "use_organization_id" {
   default     = true
 }
 
-variable "account_map_enabled" {
-  type        = bool
-  description = <<-EOT
-    Enable account map lookups for resolving account names to account IDs.
-    When `true`, uses the `account_map` variable to resolve account names.
-    When `false`, account IDs must be provided directly.
-  EOT
-  default     = true
-}
-
 variable "account_map" {
   type = object({
     full_account_map = map(string)
