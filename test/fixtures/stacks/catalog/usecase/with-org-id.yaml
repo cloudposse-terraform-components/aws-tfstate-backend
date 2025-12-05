@@ -12,6 +12,9 @@ components:
         name: tfstate-orgid
         prevent_unencrypted_uploads: true
         use_organization_id: true
+        account_map:
+          full_account_map:
+            default-test: '{{ getenv "TEST_ACCOUNT_ID" | default "<TEST_ACCOUNT_ID>" }}'
         access_roles:
           default:
             write_enabled: true

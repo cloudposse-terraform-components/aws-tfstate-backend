@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -294,9 +295,12 @@ func (s *ComponentSuite) TestWithOrgID() {
 	})
 	assert.NoError(s.T(), err)
 
-	// Parse the assume role policy
+	// Parse the assume role policy (AWS returns it URL-encoded)
+	decodedPolicy, err := url.QueryUnescape(*describeRoleOutput.Role.AssumeRolePolicyDocument)
+	assert.NoError(s.T(), err)
+
 	var assumeRolePolicy AssumeRolePolicy
-	err = json.Unmarshal([]byte(*describeRoleOutput.Role.AssumeRolePolicyDocument), &assumeRolePolicy)
+	err = json.Unmarshal([]byte(decodedPolicy), &assumeRolePolicy)
 	assert.NoError(s.T(), err)
 
 	// Verify that at least one statement has aws:PrincipalOrgID condition
@@ -358,9 +362,12 @@ func (s *ComponentSuite) TestWithoutOrgID() {
 	})
 	assert.NoError(s.T(), err)
 
-	// Parse the assume role policy
+	// Parse the assume role policy (AWS returns it URL-encoded)
+	decodedPolicy, err := url.QueryUnescape(*describeRoleOutput.Role.AssumeRolePolicyDocument)
+	assert.NoError(s.T(), err)
+
 	var assumeRolePolicy AssumeRolePolicy
-	err = json.Unmarshal([]byte(*describeRoleOutput.Role.AssumeRolePolicyDocument), &assumeRolePolicy)
+	err = json.Unmarshal([]byte(decodedPolicy), &assumeRolePolicy)
 	assert.NoError(s.T(), err)
 
 	// Verify that no statement has aws:PrincipalOrgID condition
