@@ -5,7 +5,6 @@ components:
         component: target
       vars:
         enabled: true
-        enable_server_side_encryption: true
         force_destroy: false
         name: tfstate
         prevent_unencrypted_uploads: true
