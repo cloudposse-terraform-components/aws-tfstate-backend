@@ -84,13 +84,15 @@ variable "account_map" {
   }
 }
 
-variable "iam_role_arn_template" {
-  type        = string
+variable "iam_role_arn_templates" {
+  type        = map(string)
   description = <<-EOT
-    Template for constructing IAM role ARNs from role names.
-    Should be a format string with a single %s placeholder for the role name.
-    Example: "acme-gbl-root-%s" would produce role ARNs like "arn:aws:iam::123456789012:role/acme-gbl-root-admin"
-    If null, role names are used as-is (assumed to be full role names).
+    Map of account name/ID to IAM role name template for that account.
+    Each template should be a format string with a single %s placeholder for the role name.
+    Example: { "identity" = "acme-gbl-identity-%s", "dev" = "acme-gbl-dev-%s" }
+
+    This allows different accounts to have different role naming conventions.
+    When an account is not found in this map, the role name is used as-is.
   EOT
-  default     = null
+  default     = {}
 }

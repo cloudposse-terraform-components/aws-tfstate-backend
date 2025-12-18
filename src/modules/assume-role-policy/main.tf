@@ -40,25 +40,27 @@ locals {
   ) } : {}
 
   # Convert allowed_roles map (account_name/id -> [role_names]) to ARN patterns
+  # Uses per-account templates from iam_role_arn_templates when available
   allowed_role_arns = local.enabled ? distinct(flatten([
     for account_key, role_names in var.allowed_roles : [
       for role_name in role_names : (
         role_name == "*" ?
         format("arn:%s:iam::%s:role/*", data.aws_partition.current[0].partition, local.get_account_id[account_key]) :
         format("arn:%s:iam::%s:role/%s", data.aws_partition.current[0].partition, local.get_account_id[account_key],
-        var.iam_role_arn_template != null ? format(var.iam_role_arn_template, role_name) : role_name)
+        contains(keys(var.iam_role_arn_templates), account_key) ? format(var.iam_role_arn_templates[account_key], role_name) : role_name)
       )
     ]
   ])) : []
 
   # Convert denied_roles map (account_name/id -> [role_names]) to ARN patterns
+  # Uses per-account templates from iam_role_arn_templates when available
   denied_role_arns = local.enabled ? distinct(flatten([
     for account_key, role_names in var.denied_roles : [
       for role_name in role_names : (
         role_name == "*" ?
         format("arn:%s:iam::%s:role/*", data.aws_partition.current[0].partition, local.get_account_id[account_key]) :
         format("arn:%s:iam::%s:role/%s", data.aws_partition.current[0].partition, local.get_account_id[account_key],
-        var.iam_role_arn_template != null ? format(var.iam_role_arn_template, role_name) : role_name)
+        contains(keys(var.iam_role_arn_templates), account_key) ? format(var.iam_role_arn_templates[account_key], role_name) : role_name)
       )
     ]
   ])) : []
