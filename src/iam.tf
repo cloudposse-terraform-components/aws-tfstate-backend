@@ -16,17 +16,16 @@ locals {
   #    arn:aws:iam::123456789012:role/acme-core-gbl-root-admin
   caller_arn = coalesce(data.awsutils_caller_identity.current.eks_role_arn, data.awsutils_caller_identity.current.arn)
 
-  # Build per-account IAM role name templates
-  # Uses iam_role_arn_templates from account_map if available, otherwise builds them from the account names
-  # The format is: {namespace}-{tenant}-gbl-{account_stage}-%s (e.g., acme-core-gbl-identity-%s)
-  # This ensures role lookups use the target account's context, not the deploying account's context
-  iam_role_arn_templates = try(module.account_map.outputs.iam_role_arn_templates, null) != null ? {
-    # Extract just the role name template from the full ARN templates provided by account_map
-    # account_map provides: arn:aws:iam::123456789012:role/acme-core-gbl-identity-%s
-    # We need just: acme-core-gbl-identity-%s
-    for account_name, arn_template in try(module.account_map.outputs.iam_role_arn_templates, {}) :
-    account_name => replace(arn_template, "/^arn:[^:]+:iam::[0-9]+:role\\//", "")
-  } : {}
+  # IAM role name template with two placeholders: %s for account name, %s for role name
+  # Format: {namespace}-{tenant}-gbl-{account}-{role} (e.g., acme-core-gbl-identity-admin)
+  # Uses "gbl" for environment since IAM roles are global resources
+  iam_role_arn_template = join(module.this.delimiter, compact([
+    module.this.namespace,
+    module.this.tenant,
+    "gbl",
+    "%s", # account name placeholder
+    "%s"  # role name placeholder
+  ]))
 }
 
 data "awsutils_caller_identity" "current" {}
@@ -59,9 +58,9 @@ module "assume_role" {
   allowed_permission_sets = try(each.value.allowed_permission_sets, {})
   denied_permission_sets  = try(each.value.denied_permission_sets, {})
 
-  account_map            = module.account_map.outputs
-  use_organization_id    = var.use_organization_id
-  iam_role_arn_templates = local.iam_role_arn_templates
+  account_map           = module.account_map.outputs
+  use_organization_id   = var.use_organization_id
+  iam_role_arn_template = local.iam_role_arn_template
 
   context = module.this.context
 }

@@ -84,15 +84,13 @@ variable "account_map" {
   }
 }
 
-variable "iam_role_arn_templates" {
-  type        = map(string)
+variable "iam_role_arn_template" {
+  type        = string
   description = <<-EOT
-    Map of account name/ID to IAM role name template for that account.
-    Each template should be a format string with a single %s placeholder for the role name.
-    Example: { "identity" = "acme-gbl-identity-%s", "dev" = "acme-gbl-dev-%s" }
-
-    This allows different accounts to have different role naming conventions.
-    When an account is not found in this map, the role name is used as-is.
+    Template for constructing IAM role names from account and role names.
+    Should be a format string with two %s placeholders: first for account name, second for role name.
+    Example: "acme-gbl-%s-%s" would produce role names like "acme-gbl-identity-admin"
+    If null, role names are used as-is (assumed to be full role names).
   EOT
-  default     = {}
+  default     = null
 }
