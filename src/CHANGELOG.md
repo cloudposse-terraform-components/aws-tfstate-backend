@@ -1,5 +1,49 @@
 # Changelog
 
+## Fix v2 Breaking Changes ([#57](https://github.com/cloudposse-terraform-components/aws-tfstate-backend/pull/57))
+
+### Summary
+
+This release fixes breaking changes unintentionally introduced in v2 when the `assume-role-policy` submodule replaced the shared `team-assume-role-policy` module from `account-map`. Several features were lost in that transition, causing IAM trust policies to be generated incorrectly for users with `account-map`.
+
+### Breaking Change Fixes
+
+- **Role ARN templates**: Fixed incorrect role ARN generation that used the deploying context (e.g., `use1-root`) instead of the target account context (e.g., `gbl-identity`). Role ARNs like `acme-core-use1-root-planners` are now correctly generated as `acme-core-gbl-identity-planners`.
+
+- **Team permission sets**: Restored auto-generation of SSO permission set ARNs from identity account role names. Role names like `developers` are now converted to permission set patterns like `AWSReservedSSO_IdentityDevelopersTeamAccess_*`.
+
+- **IAM user deny statement**: Restored the default deny statement for IAM users that was present in pre-v2 versions. This denies all IAM users except those explicitly allowed.
+
+- **`use_organization_id` default**: Changed default from `true` back to `false` to restore pre-v2 behavior.
+
+### Impact by Customer Type
+
+**Pre-v2 customers (with account_map):** Original behavior is restored. Changes should be minimal (ARN ordering, new resources).
+
+**Post-v2 customers (without account_map):** A new `RoleDenyAssumeRole` statement will be added. This is a security improvement that should have been included in v2 initially. It denies all IAM users except explicitly allowed principals (e.g., SuperAdmin).
+
+### Action Required
+
+**For recent v2 adopters (implemented between v2 release and this patch):**
+
+If you implemented `tfstate-backend` after v2 and want to preserve the v2 behavior for `use_organization_id`, you must explicitly set it in your stack configuration:
+
+```yaml
+components:
+  terraform:
+    tfstate-backend:
+      vars:
+        use_organization_id: true  # Preserve v2 behavior
+```
+
+Otherwise, trust policies will revert to listing individual account root ARNs instead of using the `aws:PrincipalOrgID` condition.
+
+### New Features
+
+- **`privileged` variable**: Added for remote state access without role assumption (e.g., when using SuperAdmin directly)
+- **`team_permission_sets_enabled` variable**: Controls auto-generation of team permission sets (default: `true`)
+- **`team_permission_set_name_pattern` variable**: Configurable pattern for team permission set names (default: `Identity%sTeamAccess`)
+
 ## Remove `account-map` dependency ([#54](https://github.com/cloudposse-terraform-components/aws-tfstate-backend/pull/54))
 
 ### Summary
