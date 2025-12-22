@@ -68,7 +68,7 @@ variable "use_organization_id" {
     If `false`, each account root is listed individually in the principals block, which may hit
     the trust policy size limit in larger organizations.
   EOT
-  default     = true
+  default     = false
 }
 
 variable "account_map" {
