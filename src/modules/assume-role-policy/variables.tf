@@ -73,8 +73,9 @@ variable "use_organization_id" {
 
 variable "account_map" {
   type = object({
-    full_account_map       = map(string)
-    iam_role_arn_templates = optional(map(string), {})
+    full_account_map              = map(string)
+    iam_role_arn_templates        = optional(map(string), {})
+    identity_account_account_name = optional(string, "identity")
   })
   description = <<-EOT
     Account map for resolving account names to account IDs and IAM role ARN templates.
@@ -83,11 +84,33 @@ variable "account_map" {
     - full_account_map: Map of account name to account ID
     - iam_role_arn_templates: Map of account name to IAM role ARN template with single %s placeholder for role name
       (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-core-gbl-identity-%s" })
+    - identity_account_account_name: Name of the identity account (default: "identity")
   EOT
   default = {
-    full_account_map       = {}
-    iam_role_arn_templates = {}
+    full_account_map              = {}
+    iam_role_arn_templates        = {}
+    identity_account_account_name = "identity"
   }
+}
+
+variable "team_permission_sets_enabled" {
+  type        = bool
+  description = <<-EOT
+    When true, any roles in the identity account referenced in `allowed_roles` will cause
+    corresponding AWS SSO PermissionSets to be automatically included in the trust policy.
+    This converts role names like "developers" to permission sets like "IdentityDevelopersTeamAccess".
+  EOT
+  default     = true
+}
+
+variable "team_permission_set_name_pattern" {
+  type        = string
+  description = <<-EOT
+    The pattern used to generate the AWS SSO PermissionSet name for each team.
+    Uses Go template syntax with a single %s placeholder for the team name (title-cased).
+    Example: "Identity%sTeamAccess" converts "developers" to "IdentityDevelopersTeamAccess"
+  EOT
+  default     = "Identity%sTeamAccess"
 }
 
 variable "iam_role_arn_template" {

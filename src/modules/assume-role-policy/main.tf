@@ -13,6 +13,29 @@ locals {
   # These templates have a single %s placeholder for role name only
   iam_role_arn_templates = try(var.account_map.iam_role_arn_templates, {})
 
+  # Identity account name from account_map (used for team permission set generation)
+  identity_account_name = try(var.account_map.identity_account_account_name, "identity")
+
+  # Get identity account ID if it exists in the account map
+  identity_account_id = contains(keys(local.to_account_id), local.identity_account_name) ? local.to_account_id[local.identity_account_name] : null
+
+  # Team permission sets: auto-generate SSO permission set ARNs from role names in identity account
+  # This converts role names like "developers" to permission sets like "IdentityDevelopersTeamAccess"
+  teams_from_role_map = var.team_permission_sets_enabled && local.identity_account_id != null ? (
+    try(var.allowed_roles[local.identity_account_name], [])
+  ) : []
+
+  # Convert team names to permission set names using the pattern
+  # e.g., "developers" -> "IdentityDevelopersTeamAccess"
+  team_permission_set_arns = local.enabled && length(local.teams_from_role_map) > 0 ? [
+    for team in local.teams_from_role_map :
+    format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com*/AWSReservedSSO_%s_*",
+      data.aws_partition.current[0].partition,
+      local.identity_account_id,
+      format(var.team_permission_set_name_pattern, replace(title(replace(team, "_", "-")), "-", ""))
+    ) if team != "*"
+  ] : []
+
   # Collect all account keys referenced in any of the role/permission set maps
   all_account_keys = distinct(flatten([
     keys(var.allowed_roles),
@@ -100,11 +123,15 @@ locals {
   ])) : []
 
   # Combined denied principals (ARNs + role ARNs + permission set ARNs)
+  # Note: IAM user deny pattern is added in the deny statement itself to access partition data
   denied_principals_combined = distinct(concat(
     var.denied_principal_arns,
     local.denied_role_arns,
     local.denied_permission_set_arns
   ))
+
+  # Whether to create the deny statement (always if iam_users are disabled, or if there are denied principals)
+  create_deny_statement = !var.iam_users_enabled || length(local.denied_principals_combined) > 0
 
   # Extract account IDs from allowed_roles and allowed_permission_sets (after conversion)
   allowed_account_ids_from_roles = distinct([
@@ -126,6 +153,10 @@ locals {
     toset(var.allowed_principal_arns),
     toset(var.denied_principal_arns)
   )))
+
+  # Combined allowed principals for RoleAssumeRole statement (role ARNs + team permission set ARNs)
+  # Team permission sets are included in the same statement as role ARNs for backward compatibility
+  allowed_role_and_team_arns = distinct(concat(local.allowed_role_arns, local.team_permission_set_arns))
 
   # Whether to generate the policy
   assume_role_enabled = local.enabled && (
@@ -153,9 +184,9 @@ data "aws_arn" "allowed_principals" {
 data "aws_iam_policy_document" "assume_role" {
   count = local.assume_role_enabled ? 1 : 0
 
-  # Statement 1: Allow roles from specified accounts
+  # Statement 1: Allow roles from specified accounts (includes team permission sets)
   dynamic "statement" {
-    for_each = length(local.allowed_account_ids_from_roles) > 0 && length(local.allowed_role_arns) > 0 ? [1] : []
+    for_each = length(local.allowed_account_ids_from_roles) > 0 && length(local.allowed_role_and_team_arns) > 0 ? [1] : []
     content {
       sid    = "RoleAssumeRole"
       effect = "Allow"
@@ -181,7 +212,7 @@ data "aws_iam_policy_document" "assume_role" {
       condition {
         test     = "ArnLike"
         variable = "aws:PrincipalArn"
-        values   = local.allowed_role_arns
+        values   = local.allowed_role_and_team_arns
       }
 
       principals {
@@ -263,10 +294,10 @@ data "aws_iam_policy_document" "assume_role" {
     }
   }
 
-  # Statement 4: Deny explicitly denied principals, roles, and permission sets
-  # Only create this statement if there are actually denied principals
+  # Statement 4: Deny IAM users and explicitly denied principals, roles, and permission sets
+  # Always create this statement to deny IAM users by default (unless iam_users_enabled = true)
   dynamic "statement" {
-    for_each = length(local.denied_principals_combined) > 0 ? [1] : []
+    for_each = local.create_deny_statement ? [1] : []
     content {
       sid    = "RoleDenyAssumeRole"
       effect = "Deny"
@@ -276,18 +307,14 @@ data "aws_iam_policy_document" "assume_role" {
         "sts:TagSession",
       ]
 
-      dynamic "condition" {
-        for_each = var.use_organization_id ? [1] : []
-        content {
-          test     = "StringEquals"
-          variable = "aws:PrincipalOrgID"
-          values   = [data.aws_organizations_organization.current[0].id]
-        }
-      }
       condition {
         test     = "ArnLike"
         variable = "aws:PrincipalArn"
-        values   = local.denied_principals_combined
+        # Include IAM user pattern if iam_users_enabled is false, plus any explicit denies
+        values = compact(concat(
+          local.denied_principals_combined,
+          var.iam_users_enabled ? [] : [format("arn:%s:iam::*:user/*", data.aws_partition.current[0].partition)]
+        ))
       }
 
       dynamic "condition" {

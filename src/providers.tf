@@ -10,8 +10,9 @@ variable "account_map_enabled" {
 
 variable "account_map" {
   type = object({
-    full_account_map       = map(string)
-    iam_role_arn_templates = optional(map(string), {})
+    full_account_map              = map(string)
+    iam_role_arn_templates        = optional(map(string), {})
+    identity_account_account_name = optional(string, "identity")
   })
   description = <<-EOT
     Static account map used when account_map_enabled is false.
@@ -20,10 +21,12 @@ variable "account_map" {
     - full_account_map: Map of account name to account ID
     - iam_role_arn_templates: Optional map of account name to IAM role ARN template
       (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-gbl-identity-%s" })
+    - identity_account_account_name: Name of the identity account (default: "identity")
     EOT
   default = {
-    full_account_map       = {}
-    iam_role_arn_templates = {}
+    full_account_map              = {}
+    iam_role_arn_templates        = {}
+    identity_account_account_name = "identity"
   }
 }
 
