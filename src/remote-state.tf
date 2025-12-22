@@ -1,3 +1,9 @@
+variable "privileged" {
+  type        = bool
+  description = "True if the Terraform user already has access to the backend"
+  default     = false
+}
+
 variable "account_map_component_name" {
   type        = string
   description = "The name of the account-map component"
@@ -42,6 +48,8 @@ module "account_map" {
   stage       = var.account_map_stage
 
   context = module.this.context
+
+  privileged = var.privileged
 
   # When account_map is disabled, bypass remote state and use the static account_map variable
   bypass   = !var.account_map_enabled
