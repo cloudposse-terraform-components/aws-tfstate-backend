@@ -14,7 +14,7 @@ This release fixes breaking changes unintentionally introduced in v2 when the `a
 
 - **IAM user deny statement**: Restored the default deny statement for IAM users that was present in pre-v2 versions. This denies all IAM users except those explicitly allowed.
 
-- **`use_organization_id` default**: Changed default from `true` back to `false` to restore pre-v2 behavior.
+- **`use_organization_id` default**: The `use_organization_id` variable was introduced in v2 with an incorrect default of `true`. This PR corrects the default to `false` to match the pre-v2 behavior of listing individual account root ARNs.
 
 ### Impact by Customer Type
 
