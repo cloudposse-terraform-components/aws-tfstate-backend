@@ -9,6 +9,10 @@ locals {
   # Otherwise, look it up in the account_map
   to_account_id = try(var.account_map.full_account_map, {})
 
+  # Per-account IAM role ARN templates from account_map (e.g., from account-map component)
+  # These templates have a single %s placeholder for role name only
+  iam_role_arn_templates = try(var.account_map.iam_role_arn_templates, {})
+
   # Collect all account keys referenced in any of the role/permission set maps
   all_account_keys = distinct(flatten([
     keys(var.allowed_roles),
@@ -40,27 +44,39 @@ locals {
   ) } : {}
 
   # Convert allowed_roles map (account_name/id -> [role_names]) to ARN patterns
-  # Template uses two placeholders: first %s = account name, second %s = role name
+  # Priority: 1) per-account full ARN template (single %s), 2) fallback role name template (two %s), 3) role name as-is
   allowed_role_arns = local.enabled ? distinct(flatten([
     for account_key, role_names in var.allowed_roles : [
       for role_name in role_names : (
         role_name == "*" ?
+        # Wildcard: allow all roles in the account
         format("arn:%s:iam::%s:role/*", data.aws_partition.current[0].partition, local.get_account_id[account_key]) :
+        # Per-account template from account_map is a FULL ARN template (e.g., "arn:aws:iam::123:role/prefix-%s")
+        contains(keys(local.iam_role_arn_templates), account_key) ?
+        format(local.iam_role_arn_templates[account_key], role_name) :
+        # Fallback template is just the role NAME template (two %s for account + role)
         format("arn:%s:iam::%s:role/%s", data.aws_partition.current[0].partition, local.get_account_id[account_key],
-        var.iam_role_arn_template != null ? format(var.iam_role_arn_template, account_key, role_name) : role_name)
+          var.iam_role_arn_template != null ? format(var.iam_role_arn_template, account_key, role_name) : role_name
+        )
       )
     ]
   ])) : []
 
   # Convert denied_roles map (account_name/id -> [role_names]) to ARN patterns
-  # Template uses two placeholders: first %s = account name, second %s = role name
+  # Priority: 1) per-account full ARN template (single %s), 2) fallback role name template (two %s), 3) role name as-is
   denied_role_arns = local.enabled ? distinct(flatten([
     for account_key, role_names in var.denied_roles : [
       for role_name in role_names : (
         role_name == "*" ?
+        # Wildcard: deny all roles in the account
         format("arn:%s:iam::%s:role/*", data.aws_partition.current[0].partition, local.get_account_id[account_key]) :
+        # Per-account template from account_map is a FULL ARN template (e.g., "arn:aws:iam::123:role/prefix-%s")
+        contains(keys(local.iam_role_arn_templates), account_key) ?
+        format(local.iam_role_arn_templates[account_key], role_name) :
+        # Fallback template is just the role NAME template (two %s for account + role)
         format("arn:%s:iam::%s:role/%s", data.aws_partition.current[0].partition, local.get_account_id[account_key],
-        var.iam_role_arn_template != null ? format(var.iam_role_arn_template, account_key, role_name) : role_name)
+          var.iam_role_arn_template != null ? format(var.iam_role_arn_template, account_key, role_name) : role_name
+        )
       )
     ]
   ])) : []

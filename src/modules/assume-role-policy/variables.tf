@@ -73,24 +73,34 @@ variable "use_organization_id" {
 
 variable "account_map" {
   type = object({
-    full_account_map = map(string)
+    full_account_map       = map(string)
+    iam_role_arn_templates = optional(map(string), {})
   })
   description = <<-EOT
-    Static account map for resolving account names to account IDs.
+    Account map for resolving account names to account IDs and IAM role ARN templates.
     Required when using account names (non-numeric keys) in allowed_roles, denied_roles, allowed_permission_sets, or denied_permission_sets.
+
+    - full_account_map: Map of account name to account ID
+    - iam_role_arn_templates: Map of account name to IAM role ARN template with single %s placeholder for role name
+      (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-core-gbl-identity-%s" })
   EOT
   default = {
-    full_account_map = {}
+    full_account_map       = {}
+    iam_role_arn_templates = {}
   }
 }
 
 variable "iam_role_arn_template" {
   type        = string
   description = <<-EOT
-    Template for constructing IAM role names from account and role names.
+    Fallback template for constructing IAM role names when no per-account template exists.
     Should be a format string with two %s placeholders: first for account name, second for role name.
     Example: "acme-gbl-%s-%s" would produce role names like "acme-gbl-identity-admin"
-    If null, role names are used as-is (assumed to be full role names).
+
+    Note: Per-account templates from account_map.iam_role_arn_templates take precedence.
+    Those templates use a single %s placeholder for just the role name.
+
+    If null and no per-account template exists, role names are used as-is.
   EOT
   default     = null
 }
