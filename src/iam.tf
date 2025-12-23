@@ -16,9 +16,20 @@ locals {
   #    arn:aws:iam::123456789012:role/acme-core-gbl-root-admin
   caller_arn = coalesce(data.awsutils_caller_identity.current.eks_role_arn, data.awsutils_caller_identity.current.arn)
 
-  # IAM role ARN template for constructing role ARNs from role names
-  # Format: {id}-{role_name} (e.g., acme-gbl-root-tfstate-admin)
-  iam_role_arn_template = "${module.this.id}-%s"
+  # Fallback IAM role name template used when per-account templates are not available
+  # (i.e., when account_map_enabled is false and no iam_role_arn_templates provided)
+  # Format: {namespace}-{tenant}-gbl-{account}-{role} (e.g., acme-core-gbl-identity-admin)
+  # Uses "gbl" for environment since IAM roles are global resources
+  #
+  # When account_map_enabled is true, the account-map component provides per-account
+  # iam_role_arn_templates which take precedence over this fallback template.
+  iam_role_arn_template = join(module.this.delimiter, compact([
+    module.this.namespace,
+    module.this.tenant,
+    "gbl",
+    "%s", # account name placeholder
+    "%s"  # role name placeholder
+  ]))
 }
 
 data "awsutils_caller_identity" "current" {}

@@ -68,29 +68,62 @@ variable "use_organization_id" {
     If `false`, each account root is listed individually in the principals block, which may hit
     the trust policy size limit in larger organizations.
   EOT
-  default     = true
+  default     = false
 }
 
 variable "account_map" {
   type = object({
-    full_account_map = map(string)
+    full_account_map              = map(string)
+    iam_role_arn_templates        = optional(map(string), {})
+    identity_account_account_name = optional(string, "identity")
   })
   description = <<-EOT
-    Static account map for resolving account names to account IDs.
+    Account map for resolving account names to account IDs and IAM role ARN templates.
     Required when using account names (non-numeric keys) in allowed_roles, denied_roles, allowed_permission_sets, or denied_permission_sets.
+
+    - full_account_map: Map of account name to account ID
+    - iam_role_arn_templates: Map of account name to IAM role ARN template with single %s placeholder for role name
+      (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-core-gbl-identity-%s" })
+    - identity_account_account_name: Name of the identity account (default: "identity")
   EOT
   default = {
-    full_account_map = {}
+    full_account_map              = {}
+    iam_role_arn_templates        = {}
+    identity_account_account_name = "identity"
   }
+}
+
+variable "team_permission_sets_enabled" {
+  type        = bool
+  description = <<-EOT
+    When true, any roles in the identity account referenced in `allowed_roles` will cause
+    corresponding AWS SSO PermissionSets to be automatically included in the trust policy.
+    This converts role names like "developers" to permission sets like "IdentityDevelopersTeamAccess".
+  EOT
+  default     = true
+}
+
+variable "team_permission_set_name_pattern" {
+  type        = string
+  description = <<-EOT
+    The pattern used to generate the AWS SSO PermissionSet name for each team.
+    Uses Go template syntax with a single %s placeholder for the team name (title-cased).
+    Example: "Identity%sTeamAccess" converts "developers" to "IdentityDevelopersTeamAccess"
+  EOT
+  default     = "Identity%sTeamAccess"
 }
 
 variable "iam_role_arn_template" {
   type        = string
   description = <<-EOT
-    Template for constructing IAM role ARNs from role names.
-    Should be a format string with a single %s placeholder for the role name.
-    Example: "acme-gbl-root-%s" would produce role ARNs like "arn:aws:iam::123456789012:role/acme-gbl-root-admin"
-    If null, role names are used as-is (assumed to be full role names).
+    Fallback template for constructing IAM role names when no per-account template exists.
+    Should be a format string with two %s placeholders: first for account name, second for role name.
+    Example: "acme-gbl-%s-%s" would produce role names like "acme-gbl-identity-admin"
+
+    Note: Per-account templates from account_map.iam_role_arn_templates take precedence.
+    Those templates use a single %s placeholder for just the role name.
+
+    If null and no per-account template exists, role names are used as-is.
   EOT
   default     = null
 }

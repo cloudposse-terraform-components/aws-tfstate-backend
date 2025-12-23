@@ -1,3 +1,33 @@
+variable "privileged" {
+  type        = bool
+  description = "True if the Terraform user already has access to the backend"
+  default     = false
+}
+
+variable "account_map_component_name" {
+  type        = string
+  description = "The name of the account-map component"
+  default     = "account-map"
+}
+
+variable "account_map_tenant" {
+  type        = string
+  description = "The tenant where the account-map component is deployed (defaults to current tenant)"
+  default     = "core"
+}
+
+variable "account_map_environment" {
+  type        = string
+  description = "The environment where the account-map component is deployed (e.g., 'gbl')"
+  default     = "gbl"
+}
+
+variable "account_map_stage" {
+  type        = string
+  description = "The stage where the account-map component is deployed (e.g., 'root')"
+  default     = "root"
+}
+
 # Remote state lookup for the account-map component (or fallback to static mapping).
 #
 # When account_map_enabled is true:
@@ -18,6 +48,8 @@ module "account_map" {
   stage       = var.account_map_stage
 
   context = module.this.context
+
+  privileged = var.privileged
 
   # When account_map is disabled, bypass remote state and use the static account_map variable
   bypass   = !var.account_map_enabled
