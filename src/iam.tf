@@ -115,14 +115,20 @@ resource "aws_iam_role_policy" "default" {
 # Cold start access policy - used when access_roles_enabled is false
 # This allows the caller and explicitly allowed principals to assume the role during initial setup
 locals {
-  all_cold_start_access_principals = local.cold_start_access_enabled ? toset(concat([local.caller_arn],
+  # Filter out wildcard ARNs - they can't be used to derive account root principals
+  # Wildcard ARNs are still used in the ArnLike condition, but principals must be concrete
+  all_cold_start_access_principals_raw = local.cold_start_access_enabled ? toset(concat([local.caller_arn],
   flatten([for k, v in local.access_roles : v.allowed_principal_arns]))) : toset([])
+  all_cold_start_access_principals = toset([for arn in local.all_cold_start_access_principals_raw : arn if !strcontains(arn, "*")])
+
   cold_start_access_principal_arns = local.cold_start_access_enabled ? { for k, v in local.access_roles : k => distinct(concat(
     [local.caller_arn], v.allowed_principal_arns
   )) } : {}
+
+  # Only use non-wildcard ARNs for deriving account root principals
   cold_start_access_principals = local.cold_start_access_enabled ? {
     for k, v in local.cold_start_access_principal_arns : k => formatlist("arn:%v:iam::%v:root", data.aws_partition.current.partition, distinct([
-      for arn in v : data.aws_arn.cold_start_access[arn].account
+      for arn in v : data.aws_arn.cold_start_access[arn].account if !strcontains(arn, "*")
     ]))
   } : {}
 }
