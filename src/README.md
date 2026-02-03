@@ -71,20 +71,11 @@ access. You can configure who is allowed to assume these roles.
   therefore unlikely vector of attack. (Also note that the entire DynamoDB table is optional and can be deleted
   entirely; Terraform will repopulate it as new activity takes place.)
 
-- **Self-Access Protection**: The component automatically grants access to the backend to the identity (user or role)
-  deploying it. This is a critical safety mechanism that prevents you from accidentally removing your own access to the
-  Terraform state, which would lock you out and require manual AWS Console intervention to fix.
-
-  - For **SSO permission sets** (e.g., `TerraformApplyAccess`), the component extracts the account ID and permission set
-    name and adds them to `allowed_permission_sets`. This ensures the permission set ARN pattern is used rather than the
-    specific user's session ARN, which would cause drift every time a different user runs Terraform.
-
-  - For **regular IAM roles or users**, the component adds the caller's ARN directly to `allowed_principal_arns`.
-
-  **Important**: To prevent drift and ensure consistent state, you should explicitly include the identities that will
-  apply this component in your `allowed_permission_sets` or `allowed_principal_arns` configuration. For example, if you
-  apply this component using the `TerraformApplyAccess` permission set from the root account, add it to
-  `allowed_permission_sets`. This way, the caller's identity is already in the allowed list and won't cause changes.
+- For convenience, the component automatically grants access to the backend to the user deploying it. This is helpful
+  because it allows that user, presumably SuperAdmin, to deploy the normal components that expect the user does not have
+  direct access to Terraform state, without requiring custom configuration. However, you may want to explicitly grant
+  SuperAdmin access to the backend in the `allowed_principal_arns` configuration, to ensure that SuperAdmin can always
+  access the backend, even if the component is later updated by the `root-admin` role.
 
 ### Quotas
 
@@ -235,11 +226,12 @@ terraform:
 ## References
 
 
-- [Provision tfstate-backend component](https://docs.cloudposse.com/layers/accounts/tutorials/manual-configuration/#provision-tfstate-backend-component) -
+- [Provision tfstate-backend component](https://docs.cloudposse.com/layers/accounts/tutorials/manual-configuration/#provision-tfstate-backend-component) - 
 
-- [Increase IAM role trust policy character limit](https://us-east-1.console.aws.amazon.com/servicequotas/home/services/iam/quotas/L-C07B4B0D) -
+- [Increase IAM role trust policy character limit](https://us-east-1.console.aws.amazon.com/servicequotas/home/services/iam/quotas/L-C07B4B0D) - 
 
 
 
 
 [<img src="https://cloudposse.com/logo-300x69.svg" height="32" align="right"/>](https://cpco.io/homepage?utm_source=github&utm_medium=readme&utm_campaign=cloudposse-terraform-components/aws-tfstate-backend&utm_content=)
+
