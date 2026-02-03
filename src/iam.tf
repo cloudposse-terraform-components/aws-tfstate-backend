@@ -22,10 +22,15 @@ locals {
   # For SSO permission set roles, extract the account ID and permission set name.
   # These are added to allowed_permission_sets (not allowed_principal_arns) to avoid drift
   # when different users with the same permission set run terraform.
-  # Example ARN: arn:aws:iam::123456789012:role/AWSReservedSSO_TerraformApplyAccess_bd2360a3f5507778
-  # Extracted: account_id=123456789012, permission_set_name=TerraformApplyAccess
+  #
+  # SSO role ARNs can appear in two formats:
+  #   - Path-stripped: arn:aws:iam::123456789012:role/AWSReservedSSO_TerraformApplyAccess_bd2360a3f5507778
+  #   - Full path:     arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_TerraformApplyAccess_bd2360a3f5507778
+  #
+  # The regex handles both formats with an optional path segment.
+  # Captured groups: [0]=partition, [1]=account_id, [2]=permission_set_name, [3]=instance_id (unused)
   caller_sso_parts = local.caller_is_sso_role ? regex(
-    "^arn:([^:]+):iam::([0-9]+):role/AWSReservedSSO_(.+)_([a-f0-9]{16})$",
+    "^arn:([^:]+):iam::([0-9]+):role/(?:aws-reserved/sso\\.amazonaws\\.com(?:/[^/]+)?/)?AWSReservedSSO_(.+)_([a-f0-9]{16})$",
     local.caller_arn_raw
   ) : null
 
@@ -77,12 +82,21 @@ module "assume_role" {
   for_each = local.access_roles_enabled ? local.access_roles : {}
   source   = "./modules/assume-role-policy"
 
-  allowed_roles           = each.value.allowed_roles
-  denied_roles            = each.value.denied_roles
-  allowed_principal_arns  = distinct(concat(each.value.allowed_principal_arns, compact([local.caller_arn])))
-  denied_principal_arns   = each.value.denied_principal_arns
-  allowed_permission_sets = merge(try(each.value.allowed_permission_sets, {}), local.caller_permission_set)
-  denied_permission_sets  = try(each.value.denied_permission_sets, {})
+  allowed_roles          = each.value.allowed_roles
+  denied_roles           = each.value.denied_roles
+  allowed_principal_arns = distinct(concat(each.value.allowed_principal_arns, compact([local.caller_arn])))
+  denied_principal_arns  = each.value.denied_principal_arns
+  # Merge permission sets with proper list union per account (not simple merge which would replace lists)
+  allowed_permission_sets = {
+    for account_id in distinct(concat(
+      keys(try(each.value.allowed_permission_sets, {})),
+      keys(local.caller_permission_set)
+      )) : account_id => distinct(concat(
+      try(each.value.allowed_permission_sets[account_id], []),
+      try(local.caller_permission_set[account_id], [])
+    ))
+  }
+  denied_permission_sets = try(each.value.denied_permission_sets, {})
 
   account_map           = module.account_map.outputs
   use_organization_id   = var.use_organization_id
