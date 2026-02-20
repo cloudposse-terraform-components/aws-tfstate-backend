@@ -40,7 +40,7 @@ variable "account_map_stage" {
 #   - Allows the component to function without the account-map dependency
 module "account_map" {
   source  = "cloudposse/stack-config/yaml//modules/remote-state"
-  version = "1.8.0"
+  version = "2.0.0"
 
   component   = var.account_map_component_name
   tenant      = var.account_map_tenant
