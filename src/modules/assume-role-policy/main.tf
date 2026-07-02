@@ -105,19 +105,24 @@ locals {
   ])) : []
 
   # Convert allowed_permission_sets map (account_name/id -> [permission_set_names]) to ARN patterns
-  # AWS SSO permission set IAM role ARN format: arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com/REGION/AWSReservedSSO_PERMISSION_SET_NAME_ID
-  # The * wildcard matches the region path (e.g., /us-east-2) and the permission set instance ID suffix
+  # AWS SSO permission set IAM role ARN format: arn:aws:iam::ACCOUNT_ID:role/aws-reserved/sso.amazonaws.com[/REGION]/AWSReservedSSO_PERMISSION_SET_NAME_ID
+  # The region path segment is OPTIONAL: IAM Identity Center instances homed in us-east-1 provision
+  # permission-set roles with no region segment (.../sso.amazonaws.com/AWSReservedSSO_...), while other
+  # home regions include it (.../sso.amazonaws.com/us-east-2/AWSReservedSSO_...). The `com*/` glob matches
+  # both (it absorbs an optional `/REGION`), whereas `com/*/` would require a region and 403 on us-east-1
+  # instances. This mirrors the region-optional form used by team_permission_set_arns above.
   allowed_permission_set_arns = local.enabled ? distinct(flatten([
     for account_key, permission_sets in var.allowed_permission_sets : [
-      for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_%s_*",
+      for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com*/AWSReservedSSO_%s_*",
       data.aws_partition.current[0].partition, local.get_account_id[account_key], ps_name)
     ]
   ])) : []
 
   # Convert denied_permission_sets map (account_name/id -> [permission_set_names]) to ARN patterns
+  # Region-optional glob, same as allowed_permission_set_arns above (see note there).
   denied_permission_set_arns = local.enabled ? distinct(flatten([
     for account_key, permission_sets in var.denied_permission_sets : [
-      for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com/*/AWSReservedSSO_%s_*",
+      for ps_name in permission_sets : format("arn:%s:iam::%s:role/aws-reserved/sso.amazonaws.com*/AWSReservedSSO_%s_*",
       data.aws_partition.current[0].partition, local.get_account_id[account_key], ps_name)
     ]
   ])) : []
