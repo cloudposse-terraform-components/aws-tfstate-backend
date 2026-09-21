@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/cloudposse/test-helpers/pkg/atmos"
 	helper "github.com/cloudposse/test-helpers/pkg/atmos/component-helper"
 	"github.com/gruntwork-io/terratest/modules/aws"
@@ -114,6 +116,16 @@ func (s *ComponentSuite) TestBasic() {
 			}, statement.Resource) // Check for multiple resources
 			assert.Equal(s.T(), false, statement.Condition.Bool["aws:SecureTransport"]) // Check the Bool condition
 		}
+	}
+
+	// Verify that ACLs are disabled on the Bucket, so access is governed by the bucket policy and IAM alone
+	s3Client := aws.NewS3Client(s.T(), awsRegion)
+	ownership, err := s3Client.GetBucketOwnershipControls(context.Background(), &s3.GetBucketOwnershipControlsInput{
+		Bucket: &bucketID,
+	})
+	assert.NoError(s.T(), err)
+	if err == nil && assert.Len(s.T(), ownership.OwnershipControls.Rules, 1) {
+		assert.Equal(s.T(), types.ObjectOwnershipBucketOwnerEnforced, ownership.OwnershipControls.Rules[0].ObjectOwnership)
 	}
 
 	// Look up the DynamoDB table by name

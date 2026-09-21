@@ -14,7 +14,7 @@ module "tfstate_backend" {
   force_destroy                     = var.force_destroy
   prevent_unencrypted_uploads       = var.prevent_unencrypted_uploads
   enable_point_in_time_recovery     = var.enable_point_in_time_recovery
-  bucket_ownership_enforced_enabled = false
+  bucket_ownership_enforced_enabled = var.bucket_ownership_enforced_enabled
   dynamodb_enabled                  = local.dynamodb_enabled
   s3_state_lock_enabled             = var.s3_state_lock_enabled
 

@@ -72,6 +72,20 @@ description: |-
     SuperAdmin access to the backend in the `allowed_principal_arns` configuration, to ensure that SuperAdmin can always
     access the backend, even if the component is later updated by the `root-admin` role.
 
+  ### Object Ownership and ACLs
+
+  The state bucket is created with S3 Object Ownership set to `BucketOwnerEnforced`, which disables ACLs. Access is
+  governed solely by the bucket policy and IAM, matching the AWS recommendation and the default for newly created
+  buckets. Cross-account access to the backend is granted through the IAM roles this component creates, not through
+  ACLs, so nothing in the documented usage of this component depends on ACLs being enabled.
+
+  A backend or `remote_state_backend` configuration that sets `acl: bucket-owner-full-control` remains compatible:
+  `BucketOwnerEnforced` accepts uploads that specify no ACL or the `bucket-owner-full-control` canned ACL, and object
+  ownership transfers to the bucket owner automatically, so the setting is redundant rather than harmful.
+
+  Set `bucket_ownership_enforced_enabled: false` only if you have a specific requirement for per-object ACLs on the
+  state bucket.
+
   ### Quotas
 
   When allowing access to both SAML and AWS SSO users, the trust policy for the IAM roles created by this component can

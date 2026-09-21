@@ -21,6 +21,20 @@ variable "enable_point_in_time_recovery" {
   default     = true
 }
 
+variable "bucket_ownership_enforced_enabled" {
+  type        = bool
+  description = <<-EOT
+    Set S3 bucket object ownership to "BucketOwnerEnforced", which disables ACLs on the Terraform state bucket.
+    Access is then governed solely by the bucket policy and IAM, which is what AWS recommends and the default
+    for newly created buckets.
+
+    Set to `false` only if you have a specific requirement for per-object ACLs on the state bucket. That sets
+    object ownership to "BucketOwnerPreferred" and creates an `aws_s3_bucket_acl` resource, making ACLs a live
+    access-control mechanism on the bucket that holds your Terraform state.
+  EOT
+  default     = true
+}
+
 variable "access_roles" {
   description = <<-EOT
     Map of access roles to create (key is role name, use "default" for same as component).

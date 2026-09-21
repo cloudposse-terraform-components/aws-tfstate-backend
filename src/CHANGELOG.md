@@ -1,5 +1,67 @@
 # Changelog
 
+## Stop disabling `BucketOwnerEnforced` on the state bucket ([#80](https://github.com/cloudposse-terraform-components/aws-tfstate-backend/pull/80))
+
+### Summary
+
+The component hardcoded `bucket_ownership_enforced_enabled = false` when calling `cloudposse/tfstate-backend/aws`,
+overriding that module's own default of `true`. The Terraform state bucket was therefore created with S3 Object
+Ownership set to `BucketOwnerPreferred` and an `aws_s3_bucket_acl` resource attached, leaving ACLs a live
+access-control mechanism on the bucket that holds every account's Terraform state. No variable stood behind the
+setting, so it could not be overridden from stack configuration.
+
+This release restores the module's default. Object Ownership is now `BucketOwnerEnforced`, ACLs are disabled, and
+access is governed by the bucket policy and IAM alone. A new `bucket_ownership_enforced_enabled` variable (default
+`true`) keeps the previous behaviour reachable for anyone who needs it.
+
+### Breaking Changes
+
+Existing deployments see a one-time change on the next `terraform apply`:
+
+- `module.tfstate_backend.aws_s3_bucket_ownership_controls.default[0]` is updated in place, from
+  `BucketOwnerPreferred` to `BucketOwnerEnforced`. Only `bucket` is `ForceNew` on that resource, so the bucket is
+  not replaced.
+- `module.tfstate_backend.aws_s3_bucket_acl.default[0]` is destroyed. `aws_s3_bucket_acl` has a no-op delete, so
+  this removes the resource from Terraform state and makes no AWS API call.
+
+No S3 objects are read, rewritten, or re-versioned: applying the bucket owner enforced setting does not add a new
+version of an object. State reads and writes are unaffected, and no cold start or state migration is required.
+
+### Impact
+
+The bucket ACL this component created was the `private` canned ACL, which grants nothing beyond the bucket owner,
+and the access roles this component creates grant `s3:ListBucket`, `s3:GetObject`, `s3:PutObject`, and
+`s3:DeleteObject` only — never `s3:PutObjectAcl` or `s3:GetObjectAcl`. Cross-account access to the backend has
+always been granted by the bucket policy and IAM, not by ACLs, so disabling ACLs removes an unused mechanism rather
+than a load-bearing one.
+
+An Atmos `backend` or `remote_state_backend` configuration that sets `acl: bucket-owner-full-control` continues to
+work. `BucketOwnerEnforced` accepts uploads that specify no ACL or the `bucket-owner-full-control` canned ACL, and
+object ownership transfers to the bucket owner automatically, so the setting becomes redundant rather than broken.
+
+What does break is granting access to the state bucket through bucket or object ACLs added outside this component.
+That is not something this component has ever configured, but if you added such grants by hand, convert them to
+bucket policy statements before applying.
+
+### Action Required
+
+None for most consumers. Apply the change and expect the two resource changes above.
+
+To keep the previous behaviour, set the new variable explicitly:
+
+```yaml
+components:
+  terraform:
+    tfstate-backend:
+      vars:
+        bucket_ownership_enforced_enabled: false
+```
+
+### New Features
+
+- **`bucket_ownership_enforced_enabled` variable**: Controls S3 Object Ownership on the state bucket (default:
+  `true`). Previously hardcoded to `false` with no way to override it.
+
 ## Fix v2 Breaking Changes ([#57](https://github.com/cloudposse-terraform-components/aws-tfstate-backend/pull/57))
 
 ### Summary
