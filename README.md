@@ -99,6 +99,20 @@ access. You can configure who is allowed to assume these roles.
   SuperAdmin access to the backend in the `allowed_principal_arns` configuration, to ensure that SuperAdmin can always
   access the backend, even if the component is later updated by the `root-admin` role.
 
+### Object Ownership and ACLs
+
+The state bucket is created with S3 Object Ownership set to `BucketOwnerEnforced`, which disables ACLs. Access is
+governed solely by the bucket policy and IAM, matching the AWS recommendation and the default for newly created
+buckets. Cross-account access to the backend is granted through the IAM roles this component creates, not through
+ACLs, so nothing in the documented usage of this component depends on ACLs being enabled.
+
+A backend or `remote_state_backend` configuration that sets `acl: bucket-owner-full-control` remains compatible:
+`BucketOwnerEnforced` accepts uploads that specify no ACL or the `bucket-owner-full-control` canned ACL, and object
+ownership transfers to the bucket owner automatically, so the setting is redundant rather than harmful.
+
+Set `bucket_ownership_enforced_enabled: false` only if you have a specific requirement for per-object ACLs on the
+state bucket.
+
 ### Quotas
 
 When allowing access to both SAML and AWS SSO users, the trust policy for the IAM roles created by this component can
@@ -234,6 +248,7 @@ terraform:
 | <a name="input_account_map_tenant"></a> [account\_map\_tenant](#input\_account\_map\_tenant) | The tenant where the account-map component is deployed (defaults to current tenant) | `string` | `"core"` | no |
 | <a name="input_additional_tag_map"></a> [additional\_tag\_map](#input\_additional\_tag\_map) | Additional key-value pairs to add to each map in `tags_as_list_of_maps`. Not added to `tags` or `id`.<br/>This is for some rare cases where resources want additional configuration of tags<br/>and therefore take a list of maps with tag key, value, and additional configuration. | `map(string)` | `{}` | no |
 | <a name="input_attributes"></a> [attributes](#input\_attributes) | ID element. Additional attributes (e.g. `workers` or `cluster`) to add to `id`,<br/>in the order they appear in the list. New attributes are appended to the<br/>end of the list. The elements of the list are joined by the `delimiter`<br/>and treated as a single ID element. | `list(string)` | `[]` | no |
+| <a name="input_bucket_ownership_enforced_enabled"></a> [bucket\_ownership\_enforced\_enabled](#input\_bucket\_ownership\_enforced\_enabled) | Set S3 bucket object ownership to "BucketOwnerEnforced", which disables ACLs on the Terraform state bucket.<br/>Access is then governed solely by the bucket policy and IAM, which is what AWS recommends and the default<br/>for newly created buckets.<br/><br/>Set to `false` only if you have a specific requirement for per-object ACLs on the state bucket. That sets<br/>object ownership to "BucketOwnerPreferred" and creates an `aws_s3_bucket_acl` resource, making ACLs a live<br/>access-control mechanism on the bucket that holds your Terraform state. | `bool` | `true` | no |
 | <a name="input_context"></a> [context](#input\_context) | Single object for setting entire context at once.<br/>See description of individual variables for details.<br/>Leave string and numeric variables as `null` to use default value.<br/>Individual variable settings (non-null) override settings in context object,<br/>except for attributes, tags, and additional\_tag\_map, which are merged. | `any` | <pre>{<br/>  "additional_tag_map": {},<br/>  "attributes": [],<br/>  "delimiter": null,<br/>  "descriptor_formats": {},<br/>  "enabled": true,<br/>  "environment": null,<br/>  "id_length_limit": null,<br/>  "label_key_case": null,<br/>  "label_order": [],<br/>  "label_value_case": null,<br/>  "labels_as_tags": [<br/>    "unset"<br/>  ],<br/>  "name": null,<br/>  "namespace": null,<br/>  "regex_replace_chars": null,<br/>  "stage": null,<br/>  "tags": {},<br/>  "tenant": null<br/>}</pre> | no |
 | <a name="input_delimiter"></a> [delimiter](#input\_delimiter) | Delimiter to be used between ID elements.<br/>Defaults to `-` (hyphen). Set to `""` to use no delimiter at all. | `string` | `null` | no |
 | <a name="input_descriptor_formats"></a> [descriptor\_formats](#input\_descriptor\_formats) | Describe additional descriptors to be output in the `descriptors` output map.<br/>Map of maps. Keys are names of descriptors. Values are maps of the form<br/>`{<br/>  format = string<br/>  labels = list(string)<br/>}`<br/>(Type is `any` so the map values can later be enhanced to provide additional options.)<br/>`format` is a Terraform format string to be passed to the `format()` function.<br/>`labels` is a list of labels, in order, to pass to `format()` function.<br/>Label values will be normalized before being passed to `format()` so they will be<br/>identical to how they appear in `id`.<br/>Default is `{}` (`descriptors` output will be empty). | `any` | `{}` | no |
