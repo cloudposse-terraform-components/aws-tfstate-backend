@@ -134,23 +134,16 @@ terraform:
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.9.0, < 7.0.0 |
 | <a name="requirement_awsutils"></a> [awsutils](#requirement\_awsutils) | >= 0.16.0, < 6.0.0 |
 
-## Providers
-
-| Name | Version |
-|------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.9.0, < 7.0.0 |
-| <a name="provider_awsutils"></a> [awsutils](#provider\_awsutils) | >= 0.16.0, < 6.0.0 |
-
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
-| <a name="module_account_map"></a> [account\_map](#module\_account\_map) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.0 |
+| ---- | ------ | ------- |
+| <a name="module_account_map"></a> [account\_map](#module\_account\_map) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.1 |
 | <a name="module_assume_role"></a> [assume\_role](#module\_assume\_role) | ./modules/assume-role-policy | n/a |
 | <a name="module_label"></a> [label](#module\_label) | cloudposse/label/null | 0.25.0 |
 | <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.7.1 |
@@ -159,7 +152,7 @@ terraform:
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_iam_role.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
 | [aws_arn.cold_start_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/arn) | data source |
@@ -172,7 +165,7 @@ terraform:
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_access_roles"></a> [access\_roles](#input\_access\_roles) | Map of access roles to create (key is role name, use "default" for same as component).<br/><br/>For `allowed_roles` and `denied_roles`, the map keys can be either AWS account IDs (12-digit numbers) or account names.<br/>If account names are used, they will be resolved to account IDs using the `account_map` variable.<br/>The values are lists of role names (e.g., ["admin", "terraform"]). Use ["*"] to allow/deny all roles in an account.<br/><br/>For `allowed_permission_sets` and `denied_permission_sets`, the map keys can be either AWS account IDs or account names.<br/>If account names are used, they will be resolved to account IDs using the `account_map` variable.<br/>The values are lists of permission set names (e.g., ["TerraformUpdateAccess"]).<br/><br/>Role ARNs are constructed as: `arn:{partition}:iam::{account_id}:role/{namespace}-{environment}-{stage}-{name}-{role_name}`<br/>Permission set ARNs are constructed as: `arn:{partition}:iam::{account_id}:role/aws-reserved/sso.amazonaws.com*/AWSReservedSSO_{permission_set_name}_*` | <pre>map(object({<br/>    write_enabled           = bool<br/>    allowed_roles           = map(list(string))<br/>    denied_roles            = map(list(string))<br/>    allowed_principal_arns  = list(string)<br/>    denied_principal_arns   = list(string)<br/>    allowed_permission_sets = map(list(string))<br/>    denied_permission_sets  = map(list(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_access_roles_enabled"></a> [access\_roles\_enabled](#input\_access\_roles\_enabled) | Enable access roles to be assumed. Set `false` for cold start to use a basic trust policy<br/>that only allows the current caller and explicitly allowed principals.<br/>Note that the current caller and any `allowed_principal_arns` will always be allowed to assume the role. | `bool` | `true` | no |
 | <a name="input_account_map"></a> [account\_map](#input\_account\_map) | Static account map used when account\_map\_enabled is false.<br/>Provides account name to account ID mapping without requiring the account-map component.<br/><br/>- full\_account\_map: Map of account name to account ID<br/>- iam\_role\_arn\_templates: Optional map of account name to IAM role ARN template<br/>  (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-gbl-identity-%s" })<br/>- identity\_account\_account\_name: Name of the identity account (default: "identity") | <pre>object({<br/>    full_account_map              = map(string)<br/>    iam_role_arn_templates        = optional(map(string), {})<br/>    identity_account_account_name = optional(string, "identity")<br/>  })</pre> | <pre>{<br/>  "full_account_map": {},<br/>  "iam_role_arn_templates": {},<br/>  "identity_account_account_name": "identity"<br/>}</pre> | no |
@@ -211,7 +204,7 @@ terraform:
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_tfstate_backend_access_role_arns"></a> [tfstate\_backend\_access\_role\_arns](#output\_tfstate\_backend\_access\_role\_arns) | IAM Role ARNs for accessing the Terraform State Backend |
 | <a name="output_tfstate_backend_dynamodb_table_arn"></a> [tfstate\_backend\_dynamodb\_table\_arn](#output\_tfstate\_backend\_dynamodb\_table\_arn) | Terraform state DynamoDB table ARN |
 | <a name="output_tfstate_backend_dynamodb_table_id"></a> [tfstate\_backend\_dynamodb\_table\_id](#output\_tfstate\_backend\_dynamodb\_table\_id) | Terraform state DynamoDB table ID |
