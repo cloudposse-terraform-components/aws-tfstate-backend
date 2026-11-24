@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/cloudposse/test-helpers/pkg/atmos"
 	helper "github.com/cloudposse/test-helpers/pkg/atmos/component-helper"
 	"github.com/gruntwork-io/terratest/modules/aws"
@@ -151,6 +153,12 @@ func (s *ComponentSuite) TestBasic() {
 
 	assert.EqualValues(s.T(), 3600, *awsRole.MaxSessionDuration)
 	assert.Equal(s.T(), "/", *awsRole.Path)
+
+	// No lifecycle configuration unless lifecycle_enabled is set
+	_, err = aws.NewS3Client(s.T(), awsRegion).GetBucketLifecycleConfiguration(context.Background(), &s3.GetBucketLifecycleConfigurationInput{
+		Bucket: &bucketID,
+	})
+	assert.ErrorContains(s.T(), err, "NoSuchLifecycleConfiguration")
 
 	s.DriftTest(component, stack, nil)
 }
@@ -403,6 +411,48 @@ func (s *ComponentSuite) TestWithoutOrgID() {
 
 	assert.False(s.T(), hasOrgIDCondition, "Expected trust policy to NOT have aws:PrincipalOrgID condition when use_organization_id=false")
 	assert.True(s.T(), hasAccountRootPrincipal, "Expected trust policy to have account root ARN principals when use_organization_id=false")
+
+	s.DriftTest(component, stack, nil)
+}
+
+func (s *ComponentSuite) TestEncryptionLifecycle() {
+	const component = "tfstate-bucket/encryption-lifecycle"
+	const stack = "default-test"
+	const awsRegion = "us-east-2"
+
+	defer s.DestroyAtmosComponent(s.T(), component, stack, nil)
+	options, _ := s.DeployAtmosComponent(s.T(), component, stack, nil)
+	assert.NotNil(s.T(), options)
+
+	bucketID := atmos.Output(s.T(), options, "tfstate_backend_s3_bucket_id")
+	assert.NotEmpty(s.T(), bucketID)
+
+	client := aws.NewS3Client(s.T(), awsRegion)
+
+	// Default encryption is SSE-KMS (sse_encryption: aws:kms)
+	encryption, err := client.GetBucketEncryption(context.Background(), &s3.GetBucketEncryptionInput{
+		Bucket: &bucketID,
+	})
+	assert.NoError(s.T(), err)
+	assert.Len(s.T(), encryption.ServerSideEncryptionConfiguration.Rules, 1)
+	sse := encryption.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault
+	assert.Equal(s.T(), s3types.ServerSideEncryptionAwsKms, sse.SSEAlgorithm)
+
+	// Lifecycle rule (lifecycle_enabled: true)
+	lifecycle, err := client.GetBucketLifecycleConfiguration(context.Background(), &s3.GetBucketLifecycleConfigurationInput{
+		Bucket: &bucketID,
+	})
+	assert.NoError(s.T(), err)
+	assert.Len(s.T(), lifecycle.Rules, 1)
+
+	rule := lifecycle.Rules[0]
+	assert.Equal(s.T(), "tfstate-noncurrent-versions", *rule.ID)
+	assert.Equal(s.T(), s3types.ExpirationStatusEnabled, rule.Status)
+	assert.EqualValues(s.T(), 30, *rule.NoncurrentVersionExpiration.NoncurrentDays)
+	assert.EqualValues(s.T(), 5, *rule.NoncurrentVersionExpiration.NewerNoncurrentVersions)
+	assert.True(s.T(), *rule.Expiration.ExpiredObjectDeleteMarker)
+	assert.Nil(s.T(), rule.Expiration.Days, "current objects must never expire")
+	assert.EqualValues(s.T(), 7, *rule.AbortIncompleteMultipartUpload.DaysAfterInitiation)
 
 	s.DriftTest(component, stack, nil)
 }

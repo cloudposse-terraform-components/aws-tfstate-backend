@@ -1,0 +1,28 @@
+components:
+  terraform:
+    # Validate SSE-KMS default encryption and the lifecycle rule on the state bucket
+    tfstate-bucket/encryption-lifecycle:
+      metadata:
+        component: target
+      vars:
+        enabled: true
+        force_destroy: false
+        name: tfstate-enc
+        prevent_unencrypted_uploads: true
+        dynamodb_enabled: false
+        # AWS managed aws/s3 key (kms_master_key_id unset)
+        sse_encryption: "aws:kms"
+        lifecycle_enabled: true
+        noncurrent_version_expiration_days: 30
+        noncurrent_versions_to_keep: 5
+        access_roles:
+          default:
+            write_enabled: true
+            allowed_roles:
+              default-test: ["devops", "developers", "managers", "spacelift"]
+            denied_roles: {}
+            allowed_permission_sets:
+              default-test: ["AdministratorAccess"]
+            denied_permission_sets: {}
+            allowed_principal_arns: []
+            denied_principal_arns: []

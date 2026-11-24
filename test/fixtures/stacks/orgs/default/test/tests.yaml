@@ -5,3 +5,4 @@ import:
   - catalog/usecase/statelock
   - catalog/usecase/with-org-id
   - catalog/usecase/without-org-id
+  - catalog/usecase/encryption-lifecycle
