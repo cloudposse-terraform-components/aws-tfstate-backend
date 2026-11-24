@@ -18,5 +18,12 @@ module "tfstate_backend" {
   dynamodb_enabled                  = local.dynamodb_enabled
   s3_state_lock_enabled             = var.s3_state_lock_enabled
 
+  sse_encryption    = var.sse_encryption
+  kms_master_key_id = var.kms_master_key_id
+  logging           = var.logging == null ? [] : [var.logging]
+
+  s3_replication_enabled = var.s3_replication_enabled
+  s3_replica_bucket_arn  = var.s3_replica_bucket_arn
+
   context = module.this.context
 }

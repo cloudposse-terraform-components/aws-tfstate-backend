@@ -120,6 +120,35 @@ usage: |-
             denied_principal_arns: []
   ```
 
+  ### Encryption, access logging, replication and lifecycle
+
+  All optional and off by default. The access log target and the replica bucket are not created here; both must
+  exist first (the log target in the same account and Region, the replica with versioning enabled).
+
+  ```yaml
+  terraform:
+    tfstate-backend:
+      vars:
+        # SSE-KMS with a customer managed key (null uses the AWS managed aws/s3 key)
+        sse_encryption: "aws:kms"
+        kms_master_key_id: "arn:aws:kms:us-east-1:111111111111:key/00000000-0000-0000-0000-000000000000"
+        # S3 server access logging
+        logging:
+          target_bucket: "acme-core-use1-root-access-logs"
+          target_prefix: "logs/acme-core-use1-root-tfstate/"
+        # Cross-Region replication
+        s3_replication_enabled: true
+        s3_replica_bucket_arn: "arn:aws:s3:::acme-core-usw2-root-tfstate-replica"
+        # Prune noncurrent state versions; current state is never expired
+        lifecycle_enabled: true
+        noncurrent_version_expiration_days: 90
+        noncurrent_versions_to_keep: 10
+  ```
+
+  The module skips SSE-KMS objects when replicating, so with `sse_encryption: "aws:kms"` the state itself is not
+  replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
+  [cloudposse/terraform-aws-tfstate-backend#200](https://github.com/cloudposse/terraform-aws-tfstate-backend/pull/200).
+
   <!-- prettier-ignore-start -->
   <!-- prettier-ignore-end -->
 references:
