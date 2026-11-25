@@ -165,6 +165,35 @@ terraform:
           denied_principal_arns: []
 ```
 
+### Encryption, access logging, replication and lifecycle
+
+All optional and off by default. The access log target and the replica bucket are not created here; both must
+exist first (the log target in the same account and Region, the replica with versioning enabled).
+
+```yaml
+terraform:
+  tfstate-backend:
+    vars:
+      # SSE-KMS with a customer managed key (null uses the AWS managed aws/s3 key)
+      sse_encryption: "aws:kms"
+      kms_master_key_id: "arn:aws:kms:us-east-1:111111111111:key/00000000-0000-0000-0000-000000000000"
+      # S3 server access logging
+      logging:
+        target_bucket: "acme-core-use1-root-access-logs"
+        target_prefix: "logs/acme-core-use1-root-tfstate/"
+      # Cross-Region replication
+      s3_replication_enabled: true
+      s3_replica_bucket_arn: "arn:aws:s3:::acme-core-usw2-root-tfstate-replica"
+      # Prune noncurrent state versions; current state is never expired
+      lifecycle_enabled: true
+      noncurrent_version_expiration_days: 90
+      noncurrent_versions_to_keep: 10
+```
+
+The module skips SSE-KMS objects when replicating, so with `sse_encryption: "aws:kms"` the state itself is not
+replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
+[cloudposse/terraform-aws-tfstate-backend#200](https://github.com/cloudposse/terraform-aws-tfstate-backend/pull/200).
+
 <!-- prettier-ignore-start -->
 <!-- prettier-ignore-end -->
 
@@ -185,23 +214,16 @@ terraform:
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.9.0, < 7.0.0 |
 | <a name="requirement_awsutils"></a> [awsutils](#requirement\_awsutils) | >= 0.16.0, < 6.0.0 |
 
-## Providers
-
-| Name | Version |
-|------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.9.0, < 7.0.0 |
-| <a name="provider_awsutils"></a> [awsutils](#provider\_awsutils) | >= 0.16.0, < 6.0.0 |
-
 ## Modules
 
 | Name | Source | Version |
-|------|--------|---------|
-| <a name="module_account_map"></a> [account\_map](#module\_account\_map) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.0 |
+| ---- | ------ | ------- |
+| <a name="module_account_map"></a> [account\_map](#module\_account\_map) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.1 |
 | <a name="module_assume_role"></a> [assume\_role](#module\_assume\_role) | ./modules/assume-role-policy | n/a |
 | <a name="module_label"></a> [label](#module\_label) | cloudposse/label/null | 0.25.0 |
 | <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.7.1 |
@@ -210,9 +232,10 @@ terraform:
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [aws_iam_role.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy) | resource |
+| [aws_s3_bucket_lifecycle_configuration.tfstate](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_lifecycle_configuration) | resource |
 | [aws_arn.cold_start_access](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/arn) | data source |
 | [aws_iam_policy_document.cold_start_assume_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.tfstate](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
@@ -223,7 +246,7 @@ terraform:
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
+| ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_access_roles"></a> [access\_roles](#input\_access\_roles) | Map of access roles to create (key is role name, use "default" for same as component).<br/><br/>For `allowed_roles` and `denied_roles`, the map keys can be either AWS account IDs (12-digit numbers) or account names.<br/>If account names are used, they will be resolved to account IDs using the `account_map` variable.<br/>The values are lists of role names (e.g., ["admin", "terraform"]). Use ["*"] to allow/deny all roles in an account.<br/><br/>For `allowed_permission_sets` and `denied_permission_sets`, the map keys can be either AWS account IDs or account names.<br/>If account names are used, they will be resolved to account IDs using the `account_map` variable.<br/>The values are lists of permission set names (e.g., ["TerraformUpdateAccess"]).<br/><br/>Role ARNs are constructed as: `arn:{partition}:iam::{account_id}:role/{namespace}-{environment}-{stage}-{name}-{role_name}`<br/>Permission set ARNs are constructed as: `arn:{partition}:iam::{account_id}:role/aws-reserved/sso.amazonaws.com*/AWSReservedSSO_{permission_set_name}_*` | <pre>map(object({<br/>    write_enabled           = bool<br/>    allowed_roles           = map(list(string))<br/>    denied_roles            = map(list(string))<br/>    allowed_principal_arns  = list(string)<br/>    denied_principal_arns   = list(string)<br/>    allowed_permission_sets = map(list(string))<br/>    denied_permission_sets  = map(list(string))<br/>  }))</pre> | `{}` | no |
 | <a name="input_access_roles_enabled"></a> [access\_roles\_enabled](#input\_access\_roles\_enabled) | Enable access roles to be assumed. Set `false` for cold start to use a basic trust policy<br/>that only allows the current caller and explicitly allowed principals.<br/>Note that the current caller and any `allowed_principal_arns` will always be allowed to assume the role. | `bool` | `true` | no |
 | <a name="input_account_map"></a> [account\_map](#input\_account\_map) | Static account map used when account\_map\_enabled is false.<br/>Provides account name to account ID mapping without requiring the account-map component.<br/><br/>- full\_account\_map: Map of account name to account ID<br/>- iam\_role\_arn\_templates: Optional map of account name to IAM role ARN template<br/>  (e.g., { "identity" = "arn:aws:iam::123456789012:role/acme-gbl-identity-%s" })<br/>- identity\_account\_account\_name: Name of the identity account (default: "identity") | <pre>object({<br/>    full_account_map              = map(string)<br/>    iam_role_arn_templates        = optional(map(string), {})<br/>    identity_account_account_name = optional(string, "identity")<br/>  })</pre> | <pre>{<br/>  "full_account_map": {},<br/>  "iam_role_arn_templates": {},<br/>  "identity_account_account_name": "identity"<br/>}</pre> | no |
@@ -243,17 +266,25 @@ terraform:
 | <a name="input_environment"></a> [environment](#input\_environment) | ID element. Usually used for region e.g. 'uw2', 'us-west-2', OR role 'prod', 'staging', 'dev', 'UAT' | `string` | `null` | no |
 | <a name="input_force_destroy"></a> [force\_destroy](#input\_force\_destroy) | A boolean that indicates the terraform state S3 bucket can be destroyed even if it contains objects. These objects are not recoverable. | `bool` | `false` | no |
 | <a name="input_id_length_limit"></a> [id\_length\_limit](#input\_id\_length\_limit) | Limit `id` to this many characters (minimum 6).<br/>Set to `0` for unlimited length.<br/>Set to `null` for keep the existing setting, which defaults to `0`.<br/>Does not affect `id_full`. | `number` | `null` | no |
+| <a name="input_kms_master_key_id"></a> [kms\_master\_key\_id](#input\_kms\_master\_key\_id) | AWS KMS key ID or ARN for SSE-KMS encryption of the state bucket.<br/>Used only when `sse_encryption` is `aws:kms` or `aws:kms:dsse`; `null` uses the AWS managed `aws/s3` key. | `string` | `null` | no |
 | <a name="input_label_key_case"></a> [label\_key\_case](#input\_label\_key\_case) | Controls the letter case of the `tags` keys (label names) for tags generated by this module.<br/>Does not affect keys of tags passed in via the `tags` input.<br/>Possible values: `lower`, `title`, `upper`.<br/>Default value: `title`. | `string` | `null` | no |
 | <a name="input_label_order"></a> [label\_order](#input\_label\_order) | The order in which the labels (ID elements) appear in the `id`.<br/>Defaults to ["namespace", "environment", "stage", "name", "attributes"].<br/>You can omit any of the 6 labels ("tenant" is the 6th), but at least one must be present. | `list(string)` | `null` | no |
 | <a name="input_label_value_case"></a> [label\_value\_case](#input\_label\_value\_case) | Controls the letter case of ID elements (labels) as included in `id`,<br/>set as tag values, and output by this module individually.<br/>Does not affect values of tags passed in via the `tags` input.<br/>Possible values: `lower`, `title`, `upper` and `none` (no transformation).<br/>Set this to `title` and set `delimiter` to `""` to yield Pascal Case IDs.<br/>Default value: `lower`. | `string` | `null` | no |
 | <a name="input_labels_as_tags"></a> [labels\_as\_tags](#input\_labels\_as\_tags) | Set of labels (ID elements) to include as tags in the `tags` output.<br/>Default is to include all labels.<br/>Tags with empty values will not be included in the `tags` output.<br/>Set to `[]` to suppress all generated tags.<br/>**Notes:**<br/>  The value of the `name` tag, if included, will be the `id`, not the `name`.<br/>  Unlike other `null-label` inputs, the initial setting of `labels_as_tags` cannot be<br/>  changed in later chained modules. Attempts to change it will be silently ignored. | `set(string)` | <pre>[<br/>  "default"<br/>]</pre> | no |
+| <a name="input_lifecycle_enabled"></a> [lifecycle\_enabled](#input\_lifecycle\_enabled) | Create a lifecycle configuration on the state bucket. It never expires current objects: it removes<br/>noncurrent state versions (keeping the newest `noncurrent_versions_to_keep`), expired delete markers,<br/>and multipart uploads left incomplete for 7 days. | `bool` | `false` | no |
+| <a name="input_logging"></a> [logging](#input\_logging) | S3 server access logging for the state bucket: the target bucket (same account and Region) and key prefix.<br/>`null` disables access logging. | <pre>object({<br/>    target_bucket = string<br/>    target_prefix = string<br/>  })</pre> | `null` | no |
 | <a name="input_name"></a> [name](#input\_name) | ID element. Usually the component or solution name, e.g. 'app' or 'jenkins'.<br/>This is the only ID element not also included as a `tag`.<br/>The "name" tag is set to the full `id` string. There is no tag with the value of the `name` input. | `string` | `null` | no |
 | <a name="input_namespace"></a> [namespace](#input\_namespace) | ID element. Usually an abbreviation of your organization name, e.g. 'eg' or 'cp', to help ensure generated IDs are globally unique | `string` | `null` | no |
+| <a name="input_noncurrent_version_expiration_days"></a> [noncurrent\_version\_expiration\_days](#input\_noncurrent\_version\_expiration\_days) | Days after a state version becomes noncurrent before it is deleted.<br/>With `s3_state_lock_enabled` the bucket has a 7-day GOVERNANCE Object Lock retention, so this must exceed 7. | `number` | `90` | no |
+| <a name="input_noncurrent_versions_to_keep"></a> [noncurrent\_versions\_to\_keep](#input\_noncurrent\_versions\_to\_keep) | Newest noncurrent versions of each state object kept regardless of age (1-100). | `number` | `10` | no |
 | <a name="input_prevent_unencrypted_uploads"></a> [prevent\_unencrypted\_uploads](#input\_prevent\_unencrypted\_uploads) | Prevent uploads of unencrypted objects to S3 | `bool` | `true` | no |
 | <a name="input_privileged"></a> [privileged](#input\_privileged) | True if the Terraform user already has access to the backend | `bool` | `false` | no |
 | <a name="input_regex_replace_chars"></a> [regex\_replace\_chars](#input\_regex\_replace\_chars) | Terraform regular expression (regex) string.<br/>Characters matching the regex will be removed from the ID elements.<br/>If not set, `"/[^a-zA-Z0-9-]/"` is used to remove all characters other than hyphens, letters and digits. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS Region | `string` | n/a | yes |
+| <a name="input_s3_replica_bucket_arn"></a> [s3\_replica\_bucket\_arn](#input\_s3\_replica\_bucket\_arn) | ARN of the replica (destination) bucket. Required when `s3_replication_enabled` is `true`. | `string` | `""` | no |
+| <a name="input_s3_replication_enabled"></a> [s3\_replication\_enabled](#input\_s3\_replication\_enabled) | Replicate the state bucket to `s3_replica_bucket_arn`. The replica bucket must exist and have versioning enabled. | `bool` | `false` | no |
 | <a name="input_s3_state_lock_enabled"></a> [s3\_state\_lock\_enabled](#input\_s3\_state\_lock\_enabled) | Whether to use S3 for state lock. If true, the DynamoDB table will not be created. | `bool` | `false` | no |
+| <a name="input_sse_encryption"></a> [sse\_encryption](#input\_sse\_encryption) | The server-side encryption algorithm for the state bucket.<br/>Valid values are `AES256`, `aws:kms`, and `aws:kms:dsse`. | `string` | `"AES256"` | no |
 | <a name="input_stage"></a> [stage](#input\_stage) | ID element. Usually used to indicate role, e.g. 'prod', 'staging', 'source', 'build', 'test', 'deploy', 'release' | `string` | `null` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Additional tags (e.g. `{'BusinessUnit': 'XYZ'}`).<br/>Neither the tag keys nor the tag values will be modified by this module. | `map(string)` | `{}` | no |
 | <a name="input_tenant"></a> [tenant](#input\_tenant) | ID element \_(Rarely used, not included by default)\_. A customer identifier, indicating who this instance of a resource is for | `string` | `null` | no |
@@ -262,7 +293,7 @@ terraform:
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_tfstate_backend_access_role_arns"></a> [tfstate\_backend\_access\_role\_arns](#output\_tfstate\_backend\_access\_role\_arns) | IAM Role ARNs for accessing the Terraform State Backend |
 | <a name="output_tfstate_backend_dynamodb_table_arn"></a> [tfstate\_backend\_dynamodb\_table\_arn](#output\_tfstate\_backend\_dynamodb\_table\_arn) | Terraform state DynamoDB table ARN |
 | <a name="output_tfstate_backend_dynamodb_table_id"></a> [tfstate\_backend\_dynamodb\_table\_id](#output\_tfstate\_backend\_dynamodb\_table\_id) | Terraform state DynamoDB table ID |
@@ -270,6 +301,7 @@ terraform:
 | <a name="output_tfstate_backend_s3_bucket_arn"></a> [tfstate\_backend\_s3\_bucket\_arn](#output\_tfstate\_backend\_s3\_bucket\_arn) | Terraform state S3 bucket ARN |
 | <a name="output_tfstate_backend_s3_bucket_domain_name"></a> [tfstate\_backend\_s3\_bucket\_domain\_name](#output\_tfstate\_backend\_s3\_bucket\_domain\_name) | Terraform state S3 bucket domain name |
 | <a name="output_tfstate_backend_s3_bucket_id"></a> [tfstate\_backend\_s3\_bucket\_id](#output\_tfstate\_backend\_s3\_bucket\_id) | Terraform state S3 bucket ID |
+| <a name="output_tfstate_backend_s3_replication_role_arn"></a> [tfstate\_backend\_s3\_replication\_role\_arn](#output\_tfstate\_backend\_s3\_replication\_role\_arn) | ARN of the IAM role S3 uses for replication, if `s3_replication_enabled`. Grant it `kms:Decrypt` on a customer managed source key. |
 <!-- markdownlint-restore -->
 
 
