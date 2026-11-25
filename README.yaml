@@ -139,15 +139,19 @@ usage: |-
         # Cross-Region replication
         s3_replication_enabled: true
         s3_replica_bucket_arn: "arn:aws:s3:::acme-core-usw2-root-tfstate-replica"
+        # Required to replicate SSE-KMS state: a customer managed key in the replica Region
+        s3_replica_kms_key_arn: "arn:aws:kms:us-west-2:111111111111:key/11111111-1111-1111-1111-111111111111"
+        # Keep the replica as an independent copy: deletes in the source are not replicated
+        s3_replication_delete_marker_enabled: false
         # Prune noncurrent state versions; current state is never expired
         lifecycle_enabled: true
         noncurrent_version_expiration_days: 90
         noncurrent_versions_to_keep: 10
   ```
 
-  The module skips SSE-KMS objects when replicating, so with `sse_encryption: "aws:kms"` the state itself is not
-  replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
-  [cloudposse/terraform-aws-tfstate-backend#200](https://github.com/cloudposse/terraform-aws-tfstate-backend/pull/200).
+  S3 skips SSE-KMS objects when replicating unless the rule names a replica key, so with `sse_encryption: "aws:kms"`
+  set `s3_replica_kms_key_arn`. If the source key is a customer managed key, its key policy must also let the
+  replication role (output `tfstate_backend_s3_replication_role_arn`) use `kms:Decrypt`.
 
   <!-- prettier-ignore-start -->
   <!-- prettier-ignore-end -->

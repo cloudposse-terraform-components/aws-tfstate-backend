@@ -145,15 +145,19 @@ terraform:
       # Cross-Region replication
       s3_replication_enabled: true
       s3_replica_bucket_arn: "arn:aws:s3:::acme-core-usw2-root-tfstate-replica"
+      # Required to replicate SSE-KMS state: a customer managed key in the replica Region
+      s3_replica_kms_key_arn: "arn:aws:kms:us-west-2:111111111111:key/11111111-1111-1111-1111-111111111111"
+      # Keep the replica as an independent copy: deletes in the source are not replicated
+      s3_replication_delete_marker_enabled: false
       # Prune noncurrent state versions; current state is never expired
       lifecycle_enabled: true
       noncurrent_version_expiration_days: 90
       noncurrent_versions_to_keep: 10
 ```
 
-The module skips SSE-KMS objects when replicating, so with `sse_encryption: "aws:kms"` the state itself is not
-replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
-[cloudposse/terraform-aws-tfstate-backend#200](https://github.com/cloudposse/terraform-aws-tfstate-backend/pull/200).
+S3 skips SSE-KMS objects when replicating unless the rule names a replica key, so with `sse_encryption: "aws:kms"`
+set `s3_replica_kms_key_arn`. If the source key is a customer managed key, its key policy must also let the
+replication role (output `tfstate_backend_s3_replication_role_arn`) use `kms:Decrypt`.
 
 <!-- prettier-ignore-start -->
 <!-- prettier-ignore-end -->
@@ -165,7 +169,7 @@ replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
 | Name | Version |
 | ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0.0 |
-| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.9.0, < 7.0.0 |
+| <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 6.0.0, < 7.0.0 |
 | <a name="requirement_awsutils"></a> [awsutils](#requirement\_awsutils) | >= 0.16.0, < 6.0.0 |
 
 ## Modules
@@ -175,7 +179,7 @@ replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
 | <a name="module_account_map"></a> [account\_map](#module\_account\_map) | cloudposse/stack-config/yaml//modules/remote-state | 2.0.1 |
 | <a name="module_assume_role"></a> [assume\_role](#module\_assume\_role) | ./modules/assume-role-policy | n/a |
 | <a name="module_label"></a> [label](#module\_label) | cloudposse/label/null | 0.25.0 |
-| <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.7.1 |
+| <a name="module_tfstate_backend"></a> [tfstate\_backend](#module\_tfstate\_backend) | cloudposse/tfstate-backend/aws | 1.10.0 |
 | <a name="module_this"></a> [this](#module\_this) | cloudposse/label/null | 0.25.0 |
 
 ## Resources
@@ -231,6 +235,8 @@ replicated yet. Replicating it needs `s3_replica_kms_key_arn` from
 | <a name="input_regex_replace_chars"></a> [regex\_replace\_chars](#input\_regex\_replace\_chars) | Terraform regular expression (regex) string.<br/>Characters matching the regex will be removed from the ID elements.<br/>If not set, `"/[^a-zA-Z0-9-]/"` is used to remove all characters other than hyphens, letters and digits. | `string` | `null` | no |
 | <a name="input_region"></a> [region](#input\_region) | AWS Region | `string` | n/a | yes |
 | <a name="input_s3_replica_bucket_arn"></a> [s3\_replica\_bucket\_arn](#input\_s3\_replica\_bucket\_arn) | ARN of the replica (destination) bucket. Required when `s3_replication_enabled` is `true`. | `string` | `""` | no |
+| <a name="input_s3_replica_kms_key_arn"></a> [s3\_replica\_kms\_key\_arn](#input\_s3\_replica\_kms\_key\_arn) | ARN of a customer managed KMS key in the replica Region that encrypts the replicas.<br/>Required to replicate SSE-KMS state (`sse_encryption = "aws:kms"`): S3 skips SSE-KMS objects<br/>unless the rule names a replica key. `null` (default) replicates unencrypted and SSE-S3 objects only. | `string` | `null` | no |
+| <a name="input_s3_replication_delete_marker_enabled"></a> [s3\_replication\_delete\_marker\_enabled](#input\_s3\_replication\_delete\_marker\_enabled) | Replicate delete markers to the replica bucket. Set to `false` to keep the replica as an independent copy: deleting a state object in the source then leaves it visible in the replica. | `bool` | `true` | no |
 | <a name="input_s3_replication_enabled"></a> [s3\_replication\_enabled](#input\_s3\_replication\_enabled) | Replicate the state bucket to `s3_replica_bucket_arn`. The replica bucket must exist and have versioning enabled. | `bool` | `false` | no |
 | <a name="input_s3_state_lock_enabled"></a> [s3\_state\_lock\_enabled](#input\_s3\_state\_lock\_enabled) | Whether to use S3 for state lock. If true, the DynamoDB table will not be created. | `bool` | `false` | no |
 | <a name="input_sse_encryption"></a> [sse\_encryption](#input\_sse\_encryption) | The server-side encryption algorithm for the state bucket.<br/>Valid values are `AES256`, `aws:kms`, and `aws:kms:dsse`. | `string` | `"AES256"` | no |

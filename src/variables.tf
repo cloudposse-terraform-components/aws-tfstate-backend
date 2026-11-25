@@ -135,6 +135,22 @@ variable "s3_replica_bucket_arn" {
   }
 }
 
+variable "s3_replica_kms_key_arn" {
+  type        = string
+  default     = null
+  description = <<-EOT
+    ARN of a customer managed KMS key in the replica Region that encrypts the replicas.
+    Required to replicate SSE-KMS state (`sse_encryption = "aws:kms"`): S3 skips SSE-KMS objects
+    unless the rule names a replica key. `null` (default) replicates unencrypted and SSE-S3 objects only.
+    EOT
+}
+
+variable "s3_replication_delete_marker_enabled" {
+  type        = bool
+  default     = true
+  description = "Replicate delete markers to the replica bucket. Set to `false` to keep the replica as an independent copy: deleting a state object in the source then leaves it visible in the replica."
+}
+
 variable "lifecycle_enabled" {
   type        = bool
   default     = false

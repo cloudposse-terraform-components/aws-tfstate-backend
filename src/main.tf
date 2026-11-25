@@ -7,7 +7,7 @@ locals {
 
 module "tfstate_backend" {
   source  = "cloudposse/tfstate-backend/aws"
-  version = "1.7.1"
+  version = "1.10.0"
 
   enabled = local.enabled
 
@@ -24,6 +24,9 @@ module "tfstate_backend" {
 
   s3_replication_enabled = var.s3_replication_enabled
   s3_replica_bucket_arn  = var.s3_replica_bucket_arn
+  # SSE-KMS state is replicated only when a replica key is named
+  s3_replica_kms_key_arn               = var.s3_replica_kms_key_arn
+  s3_replication_delete_marker_enabled = var.s3_replication_delete_marker_enabled
 
   context = module.this.context
 }
