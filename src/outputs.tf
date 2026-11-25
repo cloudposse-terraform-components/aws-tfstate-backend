@@ -32,3 +32,8 @@ output "tfstate_backend_access_role_arns" {
   value       = { for k, v in aws_iam_role.default : k => v.arn }
   description = "IAM Role ARNs for accessing the Terraform State Backend"
 }
+
+output "tfstate_backend_s3_replication_role_arn" {
+  value       = module.tfstate_backend.s3_replication_role_arn
+  description = "ARN of the IAM role S3 uses for replication, if `s3_replication_enabled`. Grant it `kms:Decrypt` on a customer managed source key."
+}
